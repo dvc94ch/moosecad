@@ -50,12 +50,12 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
         //for x in 0..self.dim[0] {
         //    for y in 0..self.dim[1] {
         //        for z in 0..self.dim[2] {
-        let (x, y, z) = (0, 0, 0);
-        let offset = [
+        /*let offset = [
             self.origin[0] + (x as f64).into(),
             self.origin[1] + (y as f64).into(),
             self.origin[2] + (z as f64).into(),
-        ];
+        ];*/
+        let offset: [S; 3] = [0.0.into(), 0.0.into(), 0.0.into()];
         let i_offset = mesh.vertices().len() as u32;
         //let i_offset = [0; 4]; TODO compact mesh
         for coord in Tile::COORDS.iter() {

@@ -5,7 +5,12 @@ authors = ["David Craven <david@craven.ch>"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.33"
+clap = "3.0.0-beta.2"
+exodus = { path = "../exodus" }
+inotify = "0.8.3"
 kiss3d = "0.27.0"
+mesh = { path = "../mesh" }
 nalgebra = "0.23.0"
 
 #[patch.crates-io]
