@@ -1,0 +1,10 @@
+[package]
+name = "luascad"
+version = "0.1.0"
+authors = ["David Craven <david@craven.ch>", "Henning Meyer <tutmann@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+hlua = "0.4.1"
+implicit3d = "0.14.2"
+nalgebra = "0.22.1"

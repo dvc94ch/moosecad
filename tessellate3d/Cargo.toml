@@ -1,0 +1,16 @@
+[package]
+name = "tessellate3d"
+version = "0.1.0"
+authors = ["David Craven <david@craven.ch>"]
+edition = "2018"
+
+[dependencies]
+bbox = "0.11.2"
+nalgebra = "0.22.1"
+num-traits = "0.2.12"
+alga = "0.9.3"
+permutate = "0.3.2"
+generic-array = "0.14.4"
+
+[dev-dependencies]
+implicit3d = "0.14.2"

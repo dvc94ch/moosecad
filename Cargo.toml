@@ -1,0 +1,19 @@
+[workspace]
+members = [
+    "exodus",
+    "luascad",
+    "meshview",
+    "tessellate3d",
+]
+
+[package]
+name = "moosecad"
+version = "0.1.0"
+authors = ["David Craven <david@craven.ch>"]
+edition = "2018"
+
+[dependencies]
+exodus = { path = "exodus" }
+luascad = { path = "luascad" }
+meshview = { path = "meshview" }
+tessellate3d = { path = "tessellate3d" }

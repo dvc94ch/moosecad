@@ -1,0 +1,9 @@
+[package]
+name = "exodus"
+version = "0.1.0"
+authors = ["David Craven <david@craven.ch>"]
+edition = "2018"
+
+[dependencies]
+netcdf = { version = "0.5.1" }
+#netcdf = { path = "../netcdf", features = ["static"] }

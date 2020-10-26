@@ -1,0 +1,12 @@
+[package]
+name = "meshview"
+version = "0.1.0"
+authors = ["David Craven <david@craven.ch>"]
+edition = "2018"
+
+[dependencies]
+kiss3d = "0.26.0"
+nalgebra = "0.22.1"
+
+#[patch.crates-io]
+#kiss3d = { path = "../kiss3d" }
