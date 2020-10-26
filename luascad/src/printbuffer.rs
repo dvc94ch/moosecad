@@ -1,4 +1,3 @@
-use hlua;
 use std::sync::mpsc;
 
 pub struct PrintBuffer {

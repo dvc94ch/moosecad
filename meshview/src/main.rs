@@ -45,9 +45,11 @@ fn main() -> Result<(), Error> {
             break;
         }
 
-        if let Some(_) = inotify.read_events(&mut buffer)?.next() {
+        if inotify.read_events(&mut buffer)?.next().is_some() {
             // can cause race condition, so we sleep to try to avoid it
             std::thread::sleep(Duration::from_millis(100));
+            // drain events to make sure we don't have duplicates
+            while inotify.read_events(&mut buffer)?.next().is_some() {}
             println!("rerendering");
             window.remove_node(&mut object);
             let mesh = read_mesh(&opts.input)?;

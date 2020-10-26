@@ -1,5 +1,3 @@
-use hlua;
-
 pub fn set_sandbox_env(lua: &mut hlua::Lua, env_var_name: &str) {
     lua.execute::<()>(&format!(
         "{env} = {val};",

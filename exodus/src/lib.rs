@@ -39,7 +39,7 @@ pub fn write<E: BoundedElement, S: Float + RealField>(
         &VariableType::Basic(BasicType::Char),
     )?;
     coor_names.put_chars(
-        unsafe { std::mem::transmute(&b"x\0y\0z\0"[..]) },
+        unsafe { &*(&b"x\0y\0z\0"[..] as *const [u8] as *const [i8]) },
         None,
         None,
     )?;
