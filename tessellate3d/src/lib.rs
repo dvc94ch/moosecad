@@ -1,8 +1,6 @@
-pub mod mesh;
-
-pub use bbox::BoundingBox;
-use crate::mesh::{Block, Element, Mesh, Tet4};
 use alga::general as alga;
+pub use bbox::BoundingBox;
+use mesh::{Block, Element, Mesh, Tet4};
 use nalgebra::{Point3, RealField, Vector3};
 use num_traits::Float;
 
@@ -32,11 +30,7 @@ pub struct IsosurfaceStuffing<'a, S: RealField> {
 }
 
 impl<'a, S: Float + RealField + alga::RealField + From<f64>> IsosurfaceStuffing<'a, S> {
-    pub fn new(
-        function: &'a dyn ImplicitFunction<S>,
-        resolution: S,
-        relative_error: S,
-    ) -> Self {
+    pub fn new(function: &'a dyn ImplicitFunction<S>, resolution: S, relative_error: S) -> Self {
         let bbox = function.bbox();
         Self {
             function,
@@ -51,7 +45,7 @@ impl<'a, S: Float + RealField + alga::RealField + From<f64>> IsosurfaceStuffing<
         }
     }
 
-    pub fn tesselate(self) -> Mesh<Tet4, S> {
+    pub fn tessellate(self) -> Mesh<Tet4, S> {
         let mut mesh = Mesh::new();
         let mut block = Block::new();
         for x in 0..self.dim[0] {
@@ -143,6 +137,6 @@ mod tests {
     #[test]
     fn test_convert_mesh() {
         let f = UnitSphere::new();
-        let mesh = IsosurfaceStuffing::new(&f, 0.1, 0.2).tesselate();
+        let mesh = IsosurfaceStuffing::new(&f, 0.1, 0.2).tessellate();
     }
 }

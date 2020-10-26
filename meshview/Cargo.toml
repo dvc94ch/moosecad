@@ -5,8 +5,8 @@ authors = ["David Craven <david@craven.ch>"]
 edition = "2018"
 
 [dependencies]
-kiss3d = "0.26.0"
-nalgebra = "0.22.1"
+kiss3d = "0.27.0"
+nalgebra = "0.23.0"
 
 #[patch.crates-io]
 #kiss3d = { path = "../kiss3d" }

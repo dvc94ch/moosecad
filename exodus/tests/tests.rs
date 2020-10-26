@@ -1,8 +1,4 @@
-const TEST_FILES: [&str; 3] = [
-    "tests/hook-tri.e",
-    "tests/hook-tetra.e",
-    "tests/hook-out.e",
-];
+const TEST_FILES: [&str; 3] = ["tests/hook-tri.e", "tests/hook-tetra.e", "tests/hook-out.e"];
 
 fn print_file_info(path: &str) {
     let f = netcdf::open(path).unwrap();

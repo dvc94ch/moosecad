@@ -45,7 +45,9 @@ impl<E: BoundedElement> AsMut<[E]> for Block<E> {
 
 impl<E: BoundedElement> Block<E> {
     pub fn new() -> Self {
-        Self { elems: Default::default() }
+        Self {
+            elems: Default::default(),
+        }
     }
 
     pub fn add_elem(&mut self, elem: E) {
@@ -90,7 +92,9 @@ impl<E: BoundedElement> AsMut<[E::Side]> for Side<E> {
 
 impl<E: BoundedElement> Side<E> {
     pub fn new() -> Self {
-        Self { sides: Default::default() }
+        Self {
+            sides: Default::default(),
+        }
     }
 
     pub fn add_side(&mut self, side: E::Side) {
@@ -281,10 +285,7 @@ impl BoundedElement for Tri3 {
 
     fn side(&self, i: usize) -> Self::Side {
         let indices = [[0, 1], [1, 2], [2, 0]][i];
-        Bar2([
-            self.node(indices[0]),
-            self.node(indices[1]),
-        ])
+        Bar2([self.node(indices[0]), self.node(indices[1])])
     }
 }
 
