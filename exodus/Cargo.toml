@@ -5,7 +5,15 @@ authors = ["David Craven <david@craven.ch>"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.33"
 mesh = { path = "../mesh" }
 nalgebra = "0.22.1"
-netcdf = "0.5.1"
-#netcdf = { path = "../netcdf", features = ["static"] }
+netcdf = { path = "../../netcdf", version = "0.5.1", features = ["static"] }
+num-traits = "0.2.12"
+thiserror = "1.0.21"
+
+[dev-dependencies]
+tempdir = "0.3.7"
+
+#[patch.crates-io]
+#netcdf = { path = "../netcdf" }

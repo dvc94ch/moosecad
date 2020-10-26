@@ -10,7 +10,13 @@ fn print_group(g: netcdf::Group, i: usize) {
     let indent = "".repeat(i);
     println!("{}group.{}", indent, g.name());
     for var in g.variables() {
-        println!("{}var.{}: [{}]", indent, var.name(), var.len());
+        println!(
+            "{}var.{}: [{}; {:?}]",
+            indent,
+            var.name(),
+            var.len(),
+            var.vartype()
+        );
         for attr in var.attributes() {
             println!("{}  attr.{} = {:?}", indent, attr.name(), attr.value().ok());
         }

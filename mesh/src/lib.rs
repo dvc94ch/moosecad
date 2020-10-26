@@ -31,18 +31,6 @@ pub struct Block<E: BoundedElement> {
     elems: Vec<E>,
 }
 
-impl<E: BoundedElement> AsRef<[E]> for Block<E> {
-    fn as_ref(&self) -> &[E] {
-        self.elems.as_ref()
-    }
-}
-
-impl<E: BoundedElement> AsMut<[E]> for Block<E> {
-    fn as_mut(&mut self) -> &mut [E] {
-        self.elems.as_mut()
-    }
-}
-
 impl<E: BoundedElement> Block<E> {
     pub fn new() -> Self {
         Self {
@@ -52,6 +40,22 @@ impl<E: BoundedElement> Block<E> {
 
     pub fn add_elem(&mut self, elem: E) {
         self.elems.push(elem);
+    }
+
+    pub fn elem(&self, i: usize) -> &E {
+        &self.elems[i]
+    }
+
+    pub fn elem_mut(&mut self, i: usize) -> &mut E {
+        &mut self.elems[i]
+    }
+
+    pub fn elems(&self) -> &[E] {
+        &self.elems
+    }
+
+    pub fn elems_mut(&mut self) -> &mut [E] {
+        &mut self.elems
     }
 
     pub fn boundary(&self) -> Side<E> {
@@ -78,18 +82,6 @@ pub struct Side<E: BoundedElement> {
     sides: Vec<E::Side>,
 }
 
-impl<E: BoundedElement> AsRef<[E::Side]> for Side<E> {
-    fn as_ref(&self) -> &[E::Side] {
-        self.sides.as_ref()
-    }
-}
-
-impl<E: BoundedElement> AsMut<[E::Side]> for Side<E> {
-    fn as_mut(&mut self) -> &mut [E::Side] {
-        self.sides.as_mut()
-    }
-}
-
 impl<E: BoundedElement> Side<E> {
     pub fn new() -> Self {
         Self {
@@ -99,6 +91,22 @@ impl<E: BoundedElement> Side<E> {
 
     pub fn add_side(&mut self, side: E::Side) {
         self.sides.push(side);
+    }
+
+    pub fn side(&self, i: usize) -> &E::Side {
+        &self.sides[i]
+    }
+
+    pub fn side_mut(&mut self, i: usize) -> &mut E::Side {
+        &mut self.sides[i]
+    }
+
+    pub fn sides(&self) -> &[E::Side] {
+        &self.sides
+    }
+
+    pub fn sides_mut(&mut self) -> &mut [E::Side] {
+        &mut self.sides
     }
 }
 
@@ -115,12 +123,20 @@ impl<E: BoundedElement, S: RealField> Mesh<E, S> {
         self.coords.push(point);
     }
 
-    pub fn vertex(&self, i: usize) -> Point3<S> {
-        self.coords[i]
+    pub fn vertex(&self, i: usize) -> &Point3<S> {
+        &self.coords[i]
+    }
+
+    pub fn vertex_mut(&mut self, i: usize) -> &mut Point3<S> {
+        &mut self.coords[i]
     }
 
     pub fn vertices(&self) -> &[Point3<S>] {
         &self.coords
+    }
+
+    pub fn vertices_mut(&mut self) -> &mut [Point3<S>] {
+        &mut self.coords
     }
 
     pub fn add_block(&mut self, block: Block<E>) {
@@ -135,8 +151,32 @@ impl<E: BoundedElement, S: RealField> Mesh<E, S> {
         &mut self.blocks[i]
     }
 
+    pub fn blocks(&self) -> &[Block<E>] {
+        &self.blocks
+    }
+
+    pub fn blocks_mut(&mut self) -> &mut [Block<E>] {
+        &mut self.blocks
+    }
+
     pub fn add_side(&mut self, side: Side<E>) {
         self.sides.push(side);
+    }
+
+    pub fn side(&self, i: usize) -> &Side<E> {
+        &self.sides[i]
+    }
+
+    pub fn side_mut(&mut self, i: usize) -> &mut Side<E> {
+        &mut self.sides[i]
+    }
+
+    pub fn sides(&self) -> &[Side<E>] {
+        &self.sides
+    }
+
+    pub fn sides_mut(&mut self) -> &mut [Side<E>] {
+        &mut self.sides
     }
 
     pub fn length(&self, bar2: &Bar2) -> S {
@@ -356,7 +396,7 @@ mod tests {
         block.add_elem(Tri3([0, 2, 3]));
         let side = block.boundary();
         println!("{:?}", side);
-        assert_eq!(side.as_ref().len(), 4);
+        assert_eq!(side.sides().len(), 4);
         mesh.add_block(block);
         mesh.add_side(side);
     }
@@ -371,9 +411,9 @@ mod tests {
         let tet4 = Tet4([0, 1, 2, 3]);
         let mut block = Block::new();
         block.add_elem(tet4);
-        let mut side = block.boundary();
+        let side = block.boundary();
         println!("{:?}", side);
-        assert_eq!(side.as_ref().len(), 4);
+        assert_eq!(side.sides().len(), 4);
         mesh.add_block(block);
         mesh.add_side(side);
 

@@ -1,4 +1,3 @@
-use alga::general as alga;
 pub use bbox::BoundingBox;
 use mesh::{Block, Element, Mesh, Tet4};
 use nalgebra::{Point3, RealField, Vector3};
@@ -29,7 +28,7 @@ pub struct IsosurfaceStuffing<'a, S: RealField> {
     dim: [usize; 3],
 }
 
-impl<'a, S: Float + RealField + alga::RealField + From<f64>> IsosurfaceStuffing<'a, S> {
+impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> IsosurfaceStuffing<'a, S> {
     pub fn new(function: &'a dyn ImplicitFunction<S>, resolution: S, relative_error: S) -> Self {
         let bbox = function.bbox();
         Self {
@@ -48,35 +47,36 @@ impl<'a, S: Float + RealField + alga::RealField + From<f64>> IsosurfaceStuffing<
     pub fn tessellate(self) -> Mesh<Tet4, S> {
         let mut mesh = Mesh::new();
         let mut block = Block::new();
-        for x in 0..self.dim[0] {
-            for y in 0..self.dim[1] {
-                for z in 0..self.dim[2] {
-                    let offset = [
-                        self.origin[0] + (x as f64).into(),
-                        self.origin[1] + (y as f64).into(),
-                        self.origin[2] + (z as f64).into(),
-                    ];
-                    let i_offset = mesh.vertices().len() as u32;
-                    //let i_offset = [0; 4]; TODO compact mesh
-                    for coord in Tile::COORDS.iter() {
-                        let pos = [
-                            offset[0] + coord[0].into(),
-                            offset[1] + coord[1].into(),
-                            offset[2] + coord[2].into(),
-                        ];
-                        mesh.add_vertex(Point3::new(pos[0], pos[1], pos[2]));
-                    }
-                    for tet in Tile::TETS.iter() {
-                        block.add_elem(Tet4::new([
-                            tet.node(0) + i_offset,
-                            tet.node(1) + i_offset,
-                            tet.node(2) + i_offset,
-                            tet.node(3) + i_offset,
-                        ]));
-                    }
-                }
-            }
+        //for x in 0..self.dim[0] {
+        //    for y in 0..self.dim[1] {
+        //        for z in 0..self.dim[2] {
+        let (x, y, z) = (0, 0, 0);
+        let offset = [
+            self.origin[0] + (x as f64).into(),
+            self.origin[1] + (y as f64).into(),
+            self.origin[2] + (z as f64).into(),
+        ];
+        let i_offset = mesh.vertices().len() as u32;
+        //let i_offset = [0; 4]; TODO compact mesh
+        for coord in Tile::COORDS.iter() {
+            let pos = [
+                offset[0] + coord[0].into(),
+                offset[1] + coord[1].into(),
+                offset[2] + coord[2].into(),
+            ];
+            mesh.add_vertex(Point3::new(pos[0], pos[1], pos[2]));
         }
+        for tet in Tile::TETS.iter() {
+            block.add_elem(Tet4::new([
+                tet.node(0) + i_offset,
+                tet.node(1) + i_offset,
+                tet.node(2) + i_offset,
+                tet.node(3) + i_offset,
+            ]));
+        }
+        //        }
+        //    }
+        //}
         mesh.add_block(block);
         mesh
     }
