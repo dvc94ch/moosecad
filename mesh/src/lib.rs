@@ -80,6 +80,10 @@ impl<E: BoundedElement> Block<E> {
         }
         sides
     }
+
+    pub fn swap_remove(&mut self, i: usize) {
+        self.elems.swap_remove(i);
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -408,6 +412,17 @@ pub struct Tet4([u32; 4]);
 impl Tet4 {
     pub const fn new(i: [u32; 4]) -> Self {
         Self(i)
+    }
+
+    pub fn edge(&self, i: usize) -> Bar2 {
+        let indices = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]][i];
+        Bar2([self.node(indices[0]), self.node(indices[1])])
+    }
+
+    pub fn edges(&self) -> impl Iterator<Item = Bar2> + '_ {
+        [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]
+            .iter()
+            .map(move |indices| Bar2([self.node(indices[0]), self.node(indices[1])]))
     }
 }
 
