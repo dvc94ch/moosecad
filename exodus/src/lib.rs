@@ -28,6 +28,10 @@ pub fn write<E: BoundedElement, S: Float + RealField>(
     let num_blocks = mesh.blocks().len();
     file.add_dimension("num_dim", num_dim)?;
     file.add_dimension("num_nodes", num_nodes)?;
+    file.add_dimension(
+        "num_elem",
+        mesh.blocks().iter().map(|b| b.elems().len()).sum(),
+    )?;
     file.add_dimension("num_el_blk", num_blocks)?;
     file.add_dimension("len_string", 2)?;
     file.add_unlimited_dimension("time_step")?;
@@ -65,7 +69,7 @@ pub fn write<E: BoundedElement, S: Float + RealField>(
         elems.resize(elems.capacity(), 0);
         for (i, e) in block.elems().iter().enumerate() {
             for j in 0..E::N_NODES {
-                elems[i + num_elems * j] = e.node(j) as i64;
+                elems[i * E::N_NODES + j] = e.node(j) as i64 + 1;
             }
         }
         let num_el_in_blk = format!("num_el_in_blk{}", i + 1);
@@ -77,6 +81,9 @@ pub fn write<E: BoundedElement, S: Float + RealField>(
         connect.add_attribute("elem_type", "TETRA")?; // TODO don't hardcode "TETRA"
         connect.put_values(&elems, None, None)?;
     }
+
+    let mut eb_prop = file.add_variable::<i32>("eb_prop1", &["num_el_blk"])?;
+    eb_prop.put_values(&[0], None, None)?; // TODO don't hardcode block id's
 
     Ok(())
 }
@@ -130,10 +137,10 @@ pub fn read(path: &Path) -> Result<Mesh<Tet4, f64>, Error> {
         let elems = connect.values::<i64>(None, None)?.into_raw_vec();
         let mut block = Block::new();
         for i in 0..num_el_in_blk {
-            let a = elems[i] as u32;
-            let b = elems[i + num_el_in_blk] as u32;
-            let c = elems[i + num_el_in_blk * 2] as u32;
-            let d = elems[i + num_el_in_blk * 3] as u32;
+            let a = elems[i * 4] as u32 - 1;
+            let b = elems[i * 4 + 1] as u32 - 1;
+            let c = elems[i * 4 + 2] as u32 - 1;
+            let d = elems[i * 4 + 3] as u32 - 1;
             block.add_elem(Tet4::new([a, b, c, d]));
         }
         mesh.add_block(block);
