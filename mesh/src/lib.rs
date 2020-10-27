@@ -1,12 +1,17 @@
-use nalgebra::{Point3, RealField, Vector3};
+use nalgebra::{Matrix3, Point3, RealField, Vector3};
+use num_traits::Float;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
 pub trait Element: Copy + Debug + Eq {
     const N_NODES: usize;
     fn node(&self, i: usize) -> u32;
+    fn node_mut(&mut self, i: usize) -> &mut u32;
     fn nodes(&self) -> NodeIter<'_, Self> {
         NodeIter::new(self)
+    }
+    fn nodes_mut(&mut self) -> NodeIterMut<'_, Self> {
+        NodeIterMut::new(self)
     }
 }
 
@@ -110,7 +115,7 @@ impl<E: BoundedElement> Side<E> {
     }
 }
 
-impl<E: BoundedElement, S: RealField> Mesh<E, S> {
+impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
     pub fn new() -> Self {
         Self {
             coords: Default::default(),
@@ -192,6 +197,15 @@ impl<E: BoundedElement, S: RealField> Mesh<E, S> {
         (b - a).cross(&(c - a))
     }
 
+    pub fn volume(&self, tet4: &Tet4) -> S {
+        let a = self.coords[tet4.node(0) as usize];
+        let b = self.coords[tet4.node(1) as usize];
+        let c = self.coords[tet4.node(2) as usize];
+        let d = self.coords[tet4.node(3) as usize];
+        Float::abs(Matrix3::from_columns(&[a - d, b - d, c - d]).determinant())
+            / S::from_f64(6.0).unwrap()
+    }
+
     /*pub fn aspect_ratio(&self, tet4: &Tet4) -> S {
         let mut max_length = 0.0;
         let mut sum_normals = 0.0;
@@ -204,7 +218,28 @@ impl<E: BoundedElement, S: RealField> Mesh<E, S> {
     }*/
 
     pub fn compact(&mut self) {
-        todo!()
+        let mut remap = vec![None; self.coords.len()];
+        let mut nv = 0;
+        for block in self.blocks.iter_mut() {
+            for elem in block.elems_mut() {
+                for node in elem.nodes_mut() {
+                    let i = *node as usize;
+                    if remap[i].is_none() {
+                        remap[i] = Some(nv);
+                        nv += 1;
+                    }
+                    *node = remap[i].unwrap();
+                }
+            }
+        }
+        let zero = S::from_f64(0.0).unwrap();
+        let mut coords = vec![Point3::new(zero, zero, zero); nv as usize];
+        for (i, v) in self.coords.iter().enumerate() {
+            if let Some(Some(j)) = remap.get(i) {
+                coords[*j as usize] = *v;
+            }
+        }
+        self.coords = coords;
     }
 }
 
@@ -232,6 +267,32 @@ impl<'a, E: Element> Iterator for NodeIter<'a, E> {
         }
     }
 }
+
+pub struct NodeIterMut<'a, E> {
+    elem: &'a mut E,
+    i: usize,
+}
+
+impl<'a, E: Element> NodeIterMut<'a, E> {
+    pub fn new(elem: &'a mut E) -> Self {
+        Self { elem, i: 0 }
+    }
+}
+
+impl<'a, E: Element> Iterator for NodeIterMut<'a, E> {
+    type Item = &'a mut u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.i < E::N_NODES {
+            let i = self.i;
+            self.i += 1;
+            Some(unsafe { &mut *(self.elem.node_mut(i) as *mut _) })
+        } else {
+            None
+        }
+    }
+}
+
 pub struct SideIter<'a, E> {
     elem: &'a E,
     i: usize,
@@ -272,6 +333,10 @@ impl Element for Node1 {
     fn node(&self, i: usize) -> u32 {
         self.0[i]
     }
+
+    fn node_mut(&mut self, i: usize) -> &mut u32 {
+        &mut self.0[i]
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -288,6 +353,10 @@ impl Element for Bar2 {
 
     fn node(&self, i: usize) -> u32 {
         self.0[i]
+    }
+
+    fn node_mut(&mut self, i: usize) -> &mut u32 {
+        &mut self.0[i]
     }
 }
 
@@ -316,6 +385,10 @@ impl Element for Tri3 {
     fn node(&self, i: usize) -> u32 {
         self.0[i]
     }
+
+    fn node_mut(&mut self, i: usize) -> &mut u32 {
+        &mut self.0[i]
+    }
 }
 
 impl BoundedElement for Tri3 {
@@ -343,6 +416,10 @@ impl Element for Tet4 {
 
     fn node(&self, i: usize) -> u32 {
         self.0[i]
+    }
+
+    fn node_mut(&mut self, i: usize) -> &mut u32 {
+        &mut self.0[i]
     }
 }
 
@@ -417,41 +494,66 @@ mod tests {
         mesh.add_block(block);
         mesh.add_side(side);
 
-        //assert!(mesh.normal(&tet4.side(0))[2] < 0.0);
-        //assert!(mesh.normal(&tet4.side(1))[2] > 0.0);
-        //assert!(mesh.normal(&tet4.side(2))[2] > 0.0);
-        //assert!(mesh.normal(&tet4.side(3))[2] < 0.0);
+        let sum_normals = mesh.normal(&tet4.side(0))
+            + mesh.normal(&tet4.side(1))
+            + mesh.normal(&tet4.side(2))
+            + mesh.normal(&tet4.side(3));
+
+        assert_eq!(sum_normals, Vector3::new(0.0, 0.0, 0.0));
     }
-    /*
+
+    #[test]
+    fn test_tile_volume() {
         let mut mesh = Mesh::new();
-        mesh.add_vertex(Point3::new(0.0, 0.0, 0.0));
-        mesh.add_vertex(Point3::new(1.0, 0.0, 0.0));
-        mesh.add_vertex(Point3::new(1.0, 1.0, 0.0));
-        mesh.add_vertex(Point3::new(0.0, 1.0, 0.0));
-        mesh.add_vertex(Point3::new(0.0, 0.0, 1.0));
-        mesh.add_vertex(Point3::new(1.0, 0.0, 1.0));
-        mesh.add_vertex(Point3::new(1.0, 1.0, 1.0));
-        mesh.add_vertex(Point3::new(0.0, 1.0, 1.0));
+        mesh.add_vertex(Point3::new(-0.5, -0.5, -0.5));
+        mesh.add_vertex(Point3::new(0.5, -0.5, -0.5));
+        mesh.add_vertex(Point3::new(0.5, 0.5, -0.5));
+        mesh.add_vertex(Point3::new(-0.5, 0.5, -0.5));
+        mesh.add_vertex(Point3::new(-0.5, -0.5, 0.5));
+        mesh.add_vertex(Point3::new(0.5, -0.5, 0.5));
         mesh.add_vertex(Point3::new(0.5, 0.5, 0.5));
+        mesh.add_vertex(Point3::new(-0.5, 0.5, 0.5));
+
         let mut block = Block::new();
-        block.add_elem(Tet4([1, 2, 3, 0]));
-        block.add_elem(Tet4([1, 3, 4, 0]));
-        block.add_elem(Tet4([2, 3, 6, 0]));
-        block.add_elem(Tet4([3, 6, 7, 0]));
-        block.add_elem(Tet4([5, 6, 7, 0]));
-        block.add_elem(Tet4([5, 8, 7, 0]));
-        block.add_elem(Tet4([1, 6, 2, 0]));
-        block.add_elem(Tet4([1, 5, 6, 0]));
-        block.add_elem(Tet4([3, 7, 4, 0]));
-        block.add_elem(Tet4([4, 7, 8, 0]));
-        block.add_elem(Tet4([1, 4, 5, 0]));
-        block.add_elem(Tet4([5, 8, 6, 0]));
-        let mut side = block.boundary();
+        block.add_elem(Tet4::new([0, 1, 2, 5]));
+        block.add_elem(Tet4::new([0, 2, 7, 5]));
+        block.add_elem(Tet4::new([0, 7, 5, 4]));
+        block.add_elem(Tet4::new([2, 6, 7, 5]));
+        block.add_elem(Tet4::new([0, 2, 3, 7]));
+
+        let side = block.boundary();
         println!("{:?}", side);
-        assert_eq!(side.as_ref().len(), 12);
-        mesh.add_block(block);
+        assert_eq!(side.sides().len(), 12);
         mesh.add_side(side);
 
+        let sum_volumes = mesh.volume(&block.elem(0))
+            + mesh.volume(&block.elem(1))
+            + mesh.volume(&block.elem(2))
+            + mesh.volume(&block.elem(3))
+            + mesh.volume(&block.elem(4));
 
-    }*/
+        assert!(sum_volumes < 1.0);
+        assert!(sum_volumes > 0.999999);
+        mesh.add_block(block);
+    }
+
+    #[test]
+    fn test_compact_mesh() {
+        let mut mesh = Mesh::new();
+        mesh.add_vertex(Point3::new(0.0, 0.0, 0.0));
+        mesh.add_vertex(Point3::new(0.5, 0.5, 0.5));
+        mesh.add_vertex(Point3::new(0.0, 0.0, 0.0));
+        mesh.add_vertex(Point3::new(1.5, 0.5, 0.5));
+        mesh.add_vertex(Point3::new(0.0, 0.0, 0.0));
+        mesh.add_vertex(Point3::new(1.0, 0.0, 1.0));
+        mesh.add_vertex(Point3::new(0.0, 0.0, 0.0));
+        mesh.add_vertex(Point3::new(1.0, 1.0, 1.0));
+        mesh.add_vertex(Point3::new(0.0, 0.0, 0.0));
+        let tet4 = Tet4([1, 3, 5, 7]);
+        let mut block = Block::new();
+        block.add_elem(tet4);
+        mesh.add_block(block);
+        mesh.compact();
+        assert_eq!(mesh.vertices().len(), 4);
+    }
 }
