@@ -3,6 +3,9 @@ use num_traits::Float;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+pub use nalgebra;
+pub use num_traits;
+
 pub trait Element: Copy + Debug + Eq {
     const N_NODES: usize;
     fn node(&self, i: usize) -> u32;
@@ -116,6 +119,15 @@ impl<E: BoundedElement> Side<E> {
 
     pub fn sides_mut(&mut self) -> &mut [E::Side] {
         &mut self.sides
+    }
+}
+
+impl<E: BoundedElement> Side<E>
+where
+    E::Side: BoundedElement,
+{
+    pub fn to_block(self) -> Block<E::Side> {
+        Block { elems: self.sides }
     }
 }
 
@@ -244,6 +256,19 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
             }
         }
         self.coords = coords;
+    }
+
+    pub fn boundary(&self) -> Mesh<E::Side, S>
+    where
+        E::Side: BoundedElement,
+    {
+        let mut mesh = Mesh::new();
+        mesh.coords = self.coords.clone();
+        for block in self.blocks() {
+            mesh.add_block(block.boundary().to_block());
+        }
+        mesh.compact();
+        mesh
     }
 }
 
