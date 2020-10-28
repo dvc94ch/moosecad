@@ -91,19 +91,15 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                                     + origin,
                             ),
                         ];
-                        let mut inside_bb = true;
                         let mut intersects_f = false;
                         for c in coordss.iter() {
-                            if *c >= bbox.max {
-                                inside_bb = false;
-                                break;
-                            }
-                            if self.function.value(c) < S::from_f64(0.0).unwrap() {
+                            if self.function.value(c) <= S::from_f64(0.0).unwrap() {
                                 intersects_f = true;
+                                break;
                             }
                         }
 
-                        if inside_bb && intersects_f {
+                        if intersects_f {
                             let mut tet = [0; 4];
                             for (i, c) in coordsi.iter().enumerate() {
                                 if let Some(n) = lattice_map.get(c) {
@@ -197,6 +193,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
     fn trim_spikes(&mut self) {
         let zero = S::from_f64(0.0).unwrap();
         let mut new_tets = Vec::new();
+        let mut stats = [0; 8];
         for bi in 0..self.mesh.blocks().len() {
             let mut ti = 0;
             while ti < self.mesh.block(bi).elems().len() {
@@ -210,6 +207,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                     && self.phi[d] <= zero
                 {
                     ti += 1;
+                    stats[0] += 1;
                     continue;
                 }
 
@@ -245,14 +243,16 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
 
                 if self.phi[d] == zero {
                     self.mesh.block_mut(bi).swap_remove(ti);
-                    break;
+                    stats[1] += 1;
+                    continue;
                 } else if self.phi[b] == zero && self.phi[c] == zero {
                     let e = self.cut_edge(a, d);
-                    *self.mesh.block_mut(bi).elem_mut(ti) = if flipped {
+                    *self.mesh.block_mut(bi).elem_mut(ti) = if !flipped {
                         Tet4::new([b as u32, e as u32, c as u32, d as u32])
                     } else {
                         Tet4::new([e as u32, b as u32, c as u32, d as u32])
                     };
+                    stats[2] += 1;
                 } else if self.phi[b] == zero {
                     let e = self.cut_edge(a, c);
                     let f = self.cut_edge(a, d);
@@ -263,6 +263,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                         new_tets.push(Tet4::new([e as u32, b as u32, f as u32, d as u32]));
                         Tet4::new([e as u32, b as u32, c as u32, d as u32])
                     };
+                    stats[3] += 1;
                 } else if self.phi[c] == zero {
                     let e = self.cut_edge(a, d);
                     let f = self.cut_edge(b, d);
@@ -271,6 +272,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                     } else {
                         Tet4::new([e as u32, f as u32, c as u32, d as u32])
                     };
+                    stats[4] += 1;
                 } else if self.phi[b] > zero && self.phi[c] < zero {
                     let e = self.cut_edge(a, c);
                     let f = self.cut_edge(a, d);
@@ -284,7 +286,8 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                         new_tets.push(Tet4::new([e as u32, f as u32, g as u32, d as u32]));
                         new_tets.push(Tet4::new([f as u32, g as u32, h as u32, d as u32]));
                         Tet4::new([e as u32, g as u32, c as u32, d as u32])
-                    }
+                    };
+                    stats[5] += 1;
                 } else if self.phi[b] > zero && self.phi[c] > zero {
                     let e = self.cut_edge(a, d);
                     let f = self.cut_edge(b, d);
@@ -293,7 +296,8 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                         Tet4::new([f as u32, e as u32, g as u32, d as u32])
                     } else {
                         Tet4::new([f as u32, e as u32, g as u32, d as u32])
-                    }
+                    };
+                    stats[6] += 1;
                 } else if self.phi[b] < zero && self.phi[c] < zero {
                     let e = self.cut_edge(a, b);
                     let f = self.cut_edge(a, c);
@@ -306,7 +310,8 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                         new_tets.push(Tet4::new([g as u32, e as u32, c as u32, d as u32]));
                         new_tets.push(Tet4::new([f as u32, e as u32, c as u32, g as u32]));
                         Tet4::new([e as u32, b as u32, c as u32, d as u32])
-                    }
+                    };
+                    stats[7] += 1;
                 } else {
                     panic!("unconsidered case");
                 }
@@ -317,6 +322,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 block.add_elem(tet);
             }
         }
+        println!("stats: {:?}", stats);
     }
 
     /// Remove tets with corners where phi = 0 but are outside the volume.
