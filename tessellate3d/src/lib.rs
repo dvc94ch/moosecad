@@ -247,7 +247,7 @@ impl Tile {
     const TETS: [Tet4; 5] = [
         Tet4::new([0, 1, 2, 5]),
         Tet4::new([0, 2, 7, 5]),
-        Tet4::new([0, 7, 5, 4]),
+        Tet4::new([0, 7, 4, 5]),
         Tet4::new([2, 6, 7, 5]),
         Tet4::new([0, 2, 3, 7]),
     ];
