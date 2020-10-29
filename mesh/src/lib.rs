@@ -501,7 +501,7 @@ pub struct Name([u8; 32]);
 impl<'a> From<&'a str> for Name {
     fn from(s: &'a str) -> Self {
         let utf8: &[u8] = s.as_ref();
-        let slice_len = if utf8.len() > 32 { 32 } else { utf8.len() };
+        let slice_len = if utf8.len() > 31 { 31 } else { utf8.len() };
         let mut bytes = [0u8; 32];
         bytes[..slice_len].copy_from_slice(&utf8[..slice_len]);
         Self(bytes)
@@ -511,6 +511,12 @@ impl<'a> From<&'a str> for Name {
 impl AsRef<str> for Name {
     fn as_ref(&self) -> &str {
         std::str::from_utf8(&self.0).unwrap()
+    }
+}
+
+impl AsRef<[u8]> for Name {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
