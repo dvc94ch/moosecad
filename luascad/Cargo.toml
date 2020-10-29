@@ -5,6 +5,7 @@ authors = ["David Craven <david@craven.ch>", "Henning Meyer <tutmann@gmail.com>"
 edition = "2018"
 
 [dependencies]
-hlua = "0.4.1"
+hlua = { version = "0.4.1", path = "../../hlua/hlua" }
+hlua-derive = { path = "../../hlua/derive" }
 implicit3d = "0.14.2"
 nalgebra = "0.22.1"
