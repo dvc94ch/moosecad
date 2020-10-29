@@ -24,7 +24,6 @@ pub trait ImplicitFunction<S: RealField> {
 pub struct IsosurfaceStuffing<'a, S: RealField> {
     function: &'a dyn ImplicitFunction<S>,
     resolution: S,
-    relative_error: S,
     warp_threshold: S,
     dim: [usize; 3],
     mesh: Mesh<Tet4, S>,
@@ -33,12 +32,11 @@ pub struct IsosurfaceStuffing<'a, S: RealField> {
 }
 
 impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> IsosurfaceStuffing<'a, S> {
-    pub fn new(function: &'a dyn ImplicitFunction<S>, resolution: S, relative_error: S) -> Self {
+    pub fn new(function: &'a dyn ImplicitFunction<S>, resolution: S) -> Self {
         let bbox = function.bbox();
         Self {
             function,
             resolution,
-            relative_error,
             warp_threshold: S::from_f64(0.3).unwrap(),
             dim: [
                 Float::ceil(bbox.dim()[0] / resolution).to_usize().unwrap(),
@@ -239,36 +237,36 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
             if self.phi[d] == zero {
             } else if self.phi[b] == zero && self.phi[c] == zero {
                 let e = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([e, b, c, d]), flipped, 1));
+                new_tets.push((Tet4::new([e, b, c, d]), !flipped, 1));
             } else if self.phi[b] == zero {
                 let e = self.cut_edge(a, c);
                 let f = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([e, b, f, d]), flipped, 2));
-                new_tets.push((Tet4::new([e, b, c, d]), flipped, 2));
+                new_tets.push((Tet4::new([e, b, f, d]), !flipped, 2));
+                new_tets.push((Tet4::new([e, b, c, d]), !flipped, 2));
             } else if self.phi[c] == zero {
                 let e = self.cut_edge(a, d);
                 let f = self.cut_edge(b, d);
-                new_tets.push((Tet4::new([e, f, c, d]), flipped, 3));
+                new_tets.push((Tet4::new([e, f, c, d]), !flipped, 3));
             } else if self.phi[b] > zero && self.phi[c] < zero {
                 let e = self.cut_edge(a, c);
                 let f = self.cut_edge(a, d);
                 let g = self.cut_edge(b, c);
                 let h = self.cut_edge(b, d);
-                new_tets.push((Tet4::new([e, f, g, d]), flipped, 4));
-                new_tets.push((Tet4::new([f, g, h, d]), flipped, 4));
-                new_tets.push((Tet4::new([e, g, c, d]), flipped, 4));
+                new_tets.push((Tet4::new([e, f, g, d]), !flipped, 4));
+                new_tets.push((Tet4::new([f, g, h, d]), !flipped, 4));
+                new_tets.push((Tet4::new([e, g, c, d]), !flipped, 4));
             } else if self.phi[b] > zero && self.phi[c] > zero {
                 let e = self.cut_edge(a, d);
                 let f = self.cut_edge(b, d);
                 let g = self.cut_edge(c, d);
-                new_tets.push((Tet4::new([f, e, g, d]), flipped, 5));
+                new_tets.push((Tet4::new([f, e, g, d]), !flipped, 5));
             } else if self.phi[b] < zero && self.phi[c] < zero {
                 let e = self.cut_edge(a, b);
                 let f = self.cut_edge(a, c);
                 let g = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([g, e, c, d]), flipped, 6));
-                new_tets.push((Tet4::new([f, e, c, g]), flipped, 6));
-                new_tets.push((Tet4::new([e, b, c, d]), flipped, 6));
+                new_tets.push((Tet4::new([g, e, c, d]), !flipped, 6));
+                new_tets.push((Tet4::new([f, e, c, g]), !flipped, 6));
+                new_tets.push((Tet4::new([e, b, c, d]), !flipped, 6));
             } else {
                 panic!("unconsidered case");
             }
@@ -281,7 +279,8 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 *tet.node_mut(0) = tet.node(1);
                 *tet.node_mut(1) = a;
             }
-            self.mesh.add_elem(tet, &[S::from_f64(ty as f64 / 6.0).unwrap()]);
+            self.mesh
+                .add_elem(tet, &[S::from_f64(ty as f64 / 6.0).unwrap()]);
         }
     }
 

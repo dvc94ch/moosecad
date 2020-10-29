@@ -272,17 +272,22 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
     where
         E::Side: BoundedElement,
     {
+        let zero = S::from_f64(0.0).unwrap();
         let boundary = self.boundary();
         let mut mesh = Mesh {
             name: boundary.name,
             coords: self.coords.clone(),
             elems: Vec::with_capacity(boundary.sides().len()),
-            elem_var_names: Default::default(),
-            elem_var_values: Default::default(),
+            elem_var_names: self.elem_var_names.clone(),
+            elem_var_values: vec![Vec::with_capacity(boundary.sides().len()); self.elem_var_values.len()],
             side_sets: Default::default(),
         };
+        let mut values = vec![zero; self.elem_var_values.len()];
         for (e, s) in boundary.sides() {
-            mesh.add_elem(self.elem(*e).side(*s), &[]);
+            for (i, var) in self.elem_var_values.iter().enumerate() {
+                values[i] = var[*e];
+            }
+            mesh.add_elem(self.elem(*e).side(*s), &values);
         }
         mesh.compact();
         mesh

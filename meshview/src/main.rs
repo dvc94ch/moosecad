@@ -4,7 +4,7 @@ use inotify::{Inotify, WatchMask};
 use kiss3d::light::Light;
 use kiss3d::resource::Mesh;
 use kiss3d::window::Window;
-use mesh::{BoundedElement, Element};
+use mesh::Element;
 use nalgebra as na;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -138,35 +138,27 @@ fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
     mesh.add_block(block);
     let mesh = mesh.boundary();*/
 
-    let mesh = exodus::read(path)?.boundary();
-    let na_verts = mesh
-        .vertices()
-        .iter()
-        .map(|p| na::Point3::new(p[0] as f32, p[1] as f32, p[2] as f32))
-        .collect::<Vec<_>>();
-    let mut na_faces = Vec::new();
-    let mut na_normals = Vec::new();
-    for block in mesh.blocks().iter() {
-        for elem in block.elems().iter() {
-            //for elem in elem.sides() {
-            na_faces.push(na::Point3::new(
-                elem.node(1) as u16,
-                elem.node(0) as u16,
-                elem.node(2) as u16,
-            ));
-            let n = mesh.normal(&elem);
-            let x = n[0] as f32;
-            let y = n[1] as f32;
-            let z = n[2] as f32;
-            na_normals.push(na::Vector3::new(x, y, z));
-            //}
+    let mesh = exodus::read(path)?.to_boundary();
+    let mut na_verts = Vec::with_capacity(mesh.elems().len() * 3);
+    let mut na_tex = Vec::with_capacity(mesh.elems().len() * 3);
+    let mut na_faces = Vec::with_capacity(mesh.elems().len());
+    let mut na_normals = Vec::with_capacity(mesh.elems().len());
+    for (i, elem) in mesh.elems().iter().enumerate() {
+        let elem_var = mesh.elem_var(0)[i];
+        for node in elem.nodes() {
+            let p = mesh.vertex(node);
+            na_verts.push(na::Point3::new(p[0] as f32, p[1] as f32, p[2] as f32));
+            na_tex.push(na::Point2::new(elem_var as f32, 0.5));
         }
+        na_faces.push(na::Point3::new(
+            i as u16 * 3 + 1,
+            i as u16 * 3 + 0,
+            i as u16 * 3 + 2,
+        ));
+        let n = mesh.normal(&elem);
+        na_normals.push(na::Vector3::new(n[0] as f32, n[1] as f32, n[2] as f32));
     }
-    let mut na_tex = Vec::with_capacity(na_verts.len());
-    for _ in na_verts.iter() {
-        na_tex.push(na::Point2::new(0.5, 0.5));
-    }
-    let mesh = Mesh::new(na_verts, na_faces, None, Some(na_tex), true);
+    let mesh = Mesh::new(na_verts, na_faces, Some(na_normals), Some(na_tex), true);
     Ok(Rc::new(RefCell::new(mesh)))
 }
 

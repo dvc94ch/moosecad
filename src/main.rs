@@ -15,8 +15,6 @@ struct Opts {
     r_multiplier: Option<f64>,
     #[clap(long = "tessellation-resolution")]
     tessellation_resolution: Option<f64>,
-    #[clap(long = "tessellation-error")]
-    tessellation_error: Option<f64>,
 }
 
 struct ObjectAdaptor {
@@ -44,7 +42,6 @@ fn main() -> Result<(), Error> {
     let fade_range = opts.fade_range.unwrap_or(0.1);
     let r_multiplier = opts.r_multiplier.unwrap_or(1.0);
     let tessellation_resolution = opts.tessellation_resolution.unwrap_or(0.12);
-    let tessellation_error = opts.tessellation_error.unwrap_or(2.0);
 
     let bytes = std::fs::read(opts.input)?;
     let utf8 = String::from_utf8(bytes)?;
@@ -62,7 +59,6 @@ fn main() -> Result<(), Error> {
                 tessellation_resolution,
             },
             tessellation_resolution,
-            tessellation_error,
         )
         .tessellate();
         println!("tessellation complete");

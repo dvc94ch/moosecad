@@ -11,10 +11,7 @@ pub const NC_MAX_DIMS: usize = 65536;
 pub const NC_MAX_VARS: usize = 524288;
 pub const NC_MAX_VAR_DIMS: usize = 8;
 
-pub fn write(
-    mesh: &Mesh<Tet4, f64>,
-    path: &Path,
-) -> Result<(), Error> {
+pub fn write(mesh: &Mesh<Tet4, f64>, path: &Path) -> Result<(), Error> {
     let mut file = netcdf::create(path)?;
     file.add_attribute("title", "created with moosecad")?;
     file.add_attribute("version", 5.1f32)?;
@@ -69,7 +66,11 @@ pub fn write(
         &["num_el_blk", "len_string"],
         &VariableType::Basic(BasicType::Char),
     )?;
-    eb_names.put_chars(Name::from(mesh.name().unwrap_or_default()).as_ref(), None, None)?;
+    eb_names.put_chars(
+        Name::from(mesh.name().unwrap_or_default()).as_ref(),
+        None,
+        None,
+    )?;
 
     let mut eb_prop = file.add_variable::<i32>("eb_prop1", &["num_el_blk"])?;
     eb_prop.put_values(&[0], None, None)?;
@@ -83,7 +84,8 @@ pub fn write(
     }
     file.add_dimension("num_el_in_blk1", num_elems)?;
     file.add_dimension("num_nod_per_el1", Tet4::N_NODES)?;
-    let mut connect = file.add_variable::<i64>("connect1", &["num_el_in_blk1", "num_nod_per_el1"])?;
+    let mut connect =
+        file.add_variable::<i64>("connect1", &["num_el_in_blk1", "num_nod_per_el1"])?;
     connect.add_attribute("elem_type", "TETRA4")?;
     connect.put_values(&elems, None, None)?;
 
@@ -116,7 +118,10 @@ pub fn read(path: &Path) -> Result<Mesh<Tet4, f64>, Error> {
     let file = netcdf::open(path)?;
     let num_dim = file.dimension("num_dim").ok_or(ExodusError)?.len();
     let num_nodes = file.dimension("num_nodes").ok_or(ExodusError)?.len();
-    let num_elem_var = file.dimension("num_elem_var").map(|d| d.len()).unwrap_or_default();
+    let num_elem_var = file
+        .dimension("num_elem_var")
+        .map(|d| d.len())
+        .unwrap_or_default();
     let len_string = file.dimension("len_string").ok_or(ExodusError)?.len();
     if num_dim != 3 {
         return Err(ExodusError.into());
@@ -175,7 +180,9 @@ pub fn read(path: &Path) -> Result<Mesh<Tet4, f64>, Error> {
         for i in 0..num_elem_var {
             let offset = i * len_string;
             mesh.add_elem_var(std::str::from_utf8(&names[offset..(offset + len_string)])?);
-            let vals_elem_var = file.variable(&format!("vals_elem_var{}eb1", i)).ok_or(ExodusError)?;
+            let vals_elem_var = file
+                .variable(&format!("vals_elem_var{}eb1", i))
+                .ok_or(ExodusError)?;
             let values = vals_elem_var.values(None, None)?.into_raw_vec();
             mesh.elem_var_mut(i).copy_from_slice(&values);
         }
