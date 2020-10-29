@@ -1,15 +1,16 @@
 use nalgebra::{Matrix3, Point3, RealField, Vector3};
 use num_traits::Float;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 pub use nalgebra;
 pub use num_traits;
 
 pub trait Element: Copy + Debug + Eq {
     const N_NODES: usize;
-    fn node(&self, i: usize) -> u32;
-    fn node_mut(&mut self, i: usize) -> &mut u32;
+    fn node(&self, i: usize) -> usize;
+    fn node_mut(&mut self, i: usize) -> &mut usize;
     fn nodes(&self) -> NodeIter<'_, Self> {
         NodeIter::new(self)
     }
@@ -27,121 +28,80 @@ pub trait BoundedElement: Element {
     }
 }
 
+/// Mesh representing an exodus data model.
+///
+/// TODO: multiple timesteps, multiple blocks, node sets, node vars.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Mesh<E: BoundedElement, S: RealField> {
+    name: Option<Name>,
     coords: Vec<Point3<S>>,
-    blocks: Vec<Block<E>>,
-    sides: Vec<Side<E>>,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct Block<E: BoundedElement> {
     elems: Vec<E>,
-}
-
-impl<E: BoundedElement> Block<E> {
-    pub fn new() -> Self {
-        Self {
-            elems: Default::default(),
-        }
-    }
-
-    pub fn add_elem(&mut self, elem: E) {
-        self.elems.push(elem);
-    }
-
-    pub fn elem(&self, i: usize) -> &E {
-        &self.elems[i]
-    }
-
-    pub fn elem_mut(&mut self, i: usize) -> &mut E {
-        &mut self.elems[i]
-    }
-
-    pub fn elems(&self) -> &[E] {
-        &self.elems
-    }
-
-    pub fn elems_mut(&mut self) -> &mut [E] {
-        &mut self.elems
-    }
-
-    pub fn boundary(&self) -> Side<E> {
-        let mut side_set = HashMap::new();
-        for elem in &self.elems {
-            for side in elem.sides() {
-                let mut nodes = side.nodes().collect::<Vec<_>>();
-                nodes.sort();
-                if side_set.remove(&nodes).is_none() {
-                    side_set.insert(nodes, side);
-                }
-            }
-        }
-        let mut sides = Side::new();
-        for (_, side) in side_set {
-            sides.add_side(side);
-        }
-        sides
-    }
-
-    pub fn swap_remove(&mut self, i: usize) {
-        self.elems.swap_remove(i);
-    }
+    elem_var_names: Vec<Name>,
+    elem_var_values: Vec<Vec<S>>,
+    side_sets: Vec<SideSet<E>>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct Side<E: BoundedElement> {
-    sides: Vec<E::Side>,
+pub struct SideSet<E: BoundedElement> {
+    _marker: PhantomData<E::Side>,
+    name: Option<Name>,
+    sides: HashSet<(usize, usize)>,
 }
 
-impl<E: BoundedElement> Side<E> {
+impl<E: BoundedElement> SideSet<E> {
     pub fn new() -> Self {
         Self {
+            _marker: PhantomData,
+            name: Default::default(),
             sides: Default::default(),
         }
     }
 
-    pub fn add_side(&mut self, side: E::Side) {
-        self.sides.push(side);
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|n| n.as_ref())
     }
 
-    pub fn side(&self, i: usize) -> &E::Side {
-        &self.sides[i]
+    pub fn set_name(&mut self, name: &str) {
+        self.name = Some(Name::from(name));
     }
 
-    pub fn side_mut(&mut self, i: usize) -> &mut E::Side {
-        &mut self.sides[i]
+    pub fn add_side(&mut self, elem: usize, side: usize) -> bool {
+        self.sides.insert((elem, side))
     }
 
-    pub fn sides(&self) -> &[E::Side] {
+    pub fn remove_side(&mut self, elem: usize, side: usize) -> bool {
+        self.sides.remove(&(elem, side))
+    }
+
+    pub fn sides(&self) -> &HashSet<(usize, usize)> {
         &self.sides
-    }
-
-    pub fn sides_mut(&mut self) -> &mut [E::Side] {
-        &mut self.sides
-    }
-}
-
-impl<E: BoundedElement> Side<E>
-where
-    E::Side: BoundedElement,
-{
-    pub fn to_block(self) -> Block<E::Side> {
-        Block { elems: self.sides }
     }
 }
 
 impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
     pub fn new() -> Self {
         Self {
+            name: Default::default(),
             coords: Default::default(),
-            blocks: Default::default(),
-            sides: Default::default(),
+            elems: Default::default(),
+            elem_var_names: Default::default(),
+            elem_var_values: Default::default(),
+            side_sets: Default::default(),
         }
     }
 
-    pub fn add_vertex(&mut self, point: Point3<S>) {
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|n| n.as_ref())
+    }
+
+    pub fn set_name(&mut self, name: &str) {
+        self.name = Some(Name::from(name));
+    }
+
+    pub fn add_vertex(&mut self, point: Point3<S>) -> usize {
+        let i = self.coords.len();
         self.coords.push(point);
+        i
     }
 
     pub fn vertex(&self, i: usize) -> &Point3<S> {
@@ -160,44 +120,78 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
         &mut self.coords
     }
 
-    pub fn add_block(&mut self, block: Block<E>) {
-        self.blocks.push(block);
+    pub fn add_elem_var(&mut self, name: &str) -> usize {
+        let i = self.elem_var_names.len();
+        self.elem_var_names.push(Name::from(name));
+        let zero = S::from_f64(0.0).unwrap();
+        let values = vec![zero; self.elems.len()];
+        self.elem_var_values.push(values);
+        i
     }
 
-    pub fn block(&self, i: usize) -> &Block<E> {
-        &self.blocks[i]
+    pub fn elem_vars(&self) -> &[Name] {
+        &self.elem_var_names
     }
 
-    pub fn block_mut(&mut self, i: usize) -> &mut Block<E> {
-        &mut self.blocks[i]
+    pub fn add_elem(&mut self, elem: E, vars: &[S]) {
+        debug_assert_eq!(vars.len(), self.elem_var_names.len());
+        self.elems.push(elem);
+        for (var, val) in self.elem_var_values.iter_mut().zip(vars) {
+            var.push(*val);
+        }
     }
 
-    pub fn blocks(&self) -> &[Block<E>] {
-        &self.blocks
+    pub fn elem(&self, i: usize) -> &E {
+        &self.elems[i]
     }
 
-    pub fn blocks_mut(&mut self) -> &mut [Block<E>] {
-        &mut self.blocks
+    pub fn elem_var(&self, i: usize) -> &[S] {
+        &self.elem_var_values[i]
     }
 
-    pub fn add_side(&mut self, side: Side<E>) {
-        self.sides.push(side);
+    pub fn elem_mut(&mut self, i: usize) -> &mut E {
+        &mut self.elems[i]
     }
 
-    pub fn side(&self, i: usize) -> &Side<E> {
-        &self.sides[i]
+    pub fn elem_var_mut(&mut self, i: usize) -> &mut [S] {
+        &mut self.elem_var_values[i]
     }
 
-    pub fn side_mut(&mut self, i: usize) -> &mut Side<E> {
-        &mut self.sides[i]
+    pub fn elems(&self) -> &[E] {
+        &self.elems
     }
 
-    pub fn sides(&self) -> &[Side<E>] {
-        &self.sides
+    pub fn elems_mut(&mut self) -> &mut [E] {
+        &mut self.elems
     }
 
-    pub fn sides_mut(&mut self) -> &mut [Side<E>] {
-        &mut self.sides
+    pub fn elem_swap_remove(&mut self, i: usize) {
+        self.elems.swap_remove(i);
+        for var in &mut self.elem_var_values {
+            var.swap_remove(i);
+        }
+    }
+
+    pub fn add_side_set(&mut self, side: SideSet<E>) -> usize {
+        let i = self.side_sets.len();
+        self.side_sets.push(side);
+        i
+    }
+
+    pub fn side_set(&self, i: usize) -> &SideSet<E> {
+        &self.side_sets[i]
+    }
+
+    pub fn side_set_mut(&mut self, i: usize) -> &mut SideSet<E> {
+        &mut self.side_sets[i]
+    }
+
+    pub fn side_sets(&self) -> &[SideSet<E>] {
+        &self.side_sets
+    }
+
+    pub fn side_sets_mut(&mut self) -> &mut [SideSet<E>] {
+        &mut self.side_sets
     }
 
     pub fn length(&self, bar2: &Bar2) -> S {
@@ -236,16 +230,14 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
     pub fn compact(&mut self) {
         let mut remap = vec![None; self.coords.len()];
         let mut nv = 0;
-        for block in self.blocks.iter_mut() {
-            for elem in block.elems_mut() {
-                for node in elem.nodes_mut() {
-                    let i = *node as usize;
-                    if remap[i].is_none() {
-                        remap[i] = Some(nv);
-                        nv += 1;
-                    }
-                    *node = remap[i].unwrap();
+        for elem in self.elems_mut() {
+            for node in elem.nodes_mut() {
+                let i = *node as usize;
+                if remap[i].is_none() {
+                    remap[i] = Some(nv);
+                    nv += 1;
                 }
+                *node = remap[i].unwrap();
             }
         }
         let zero = S::from_f64(0.0).unwrap();
@@ -258,14 +250,39 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
         self.coords = coords;
     }
 
-    pub fn boundary(&self) -> Mesh<E::Side, S>
+    pub fn boundary(&self) -> SideSet<E> {
+        let mut side_set = HashMap::new();
+        for (e, elem) in self.elems().iter().enumerate() {
+            for (s, side) in elem.sides().enumerate() {
+                let mut nodes = side.nodes().collect::<Vec<_>>();
+                nodes.sort();
+                if side_set.remove(&nodes).is_none() {
+                    side_set.insert(nodes, (e, s));
+                }
+            }
+        }
+        let mut sides = SideSet::new();
+        for (_, (e, s)) in side_set {
+            sides.add_side(e, s);
+        }
+        sides
+    }
+
+    pub fn to_boundary(&self) -> Mesh<E::Side, S>
     where
         E::Side: BoundedElement,
     {
-        let mut mesh = Mesh::new();
-        mesh.coords = self.coords.clone();
-        for block in self.blocks() {
-            mesh.add_block(block.boundary().to_block());
+        let boundary = self.boundary();
+        let mut mesh = Mesh {
+            name: boundary.name,
+            coords: self.coords.clone(),
+            elems: Vec::with_capacity(boundary.sides().len()),
+            elem_var_names: Default::default(),
+            elem_var_values: Default::default(),
+            side_sets: Default::default(),
+        };
+        for (e, s) in boundary.sides() {
+            mesh.add_elem(self.elem(*e).side(*s), &[]);
         }
         mesh.compact();
         mesh
@@ -284,7 +301,7 @@ impl<'a, E: Element> NodeIter<'a, E> {
 }
 
 impl<'a, E: Element> Iterator for NodeIter<'a, E> {
-    type Item = u32;
+    type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.i < E::N_NODES {
@@ -309,7 +326,7 @@ impl<'a, E: Element> NodeIterMut<'a, E> {
 }
 
 impl<'a, E: Element> Iterator for NodeIterMut<'a, E> {
-    type Item = &'a mut u32;
+    type Item = &'a mut usize;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.i < E::N_NODES {
@@ -348,10 +365,10 @@ impl<'a, E: BoundedElement> Iterator for SideIter<'a, E> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Node1([u32; 1]);
+pub struct Node1([usize; 1]);
 
 impl Node1 {
-    pub const fn new(i: [u32; 1]) -> Self {
+    pub const fn new(i: [usize; 1]) -> Self {
         Self(i)
     }
 }
@@ -359,20 +376,20 @@ impl Node1 {
 impl Element for Node1 {
     const N_NODES: usize = 1;
 
-    fn node(&self, i: usize) -> u32 {
+    fn node(&self, i: usize) -> usize {
         self.0[i]
     }
 
-    fn node_mut(&mut self, i: usize) -> &mut u32 {
+    fn node_mut(&mut self, i: usize) -> &mut usize {
         &mut self.0[i]
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Bar2([u32; 2]);
+pub struct Bar2([usize; 2]);
 
 impl Bar2 {
-    pub const fn new(i: [u32; 2]) -> Self {
+    pub const fn new(i: [usize; 2]) -> Self {
         Self(i)
     }
 }
@@ -380,11 +397,11 @@ impl Bar2 {
 impl Element for Bar2 {
     const N_NODES: usize = 2;
 
-    fn node(&self, i: usize) -> u32 {
+    fn node(&self, i: usize) -> usize {
         self.0[i]
     }
 
-    fn node_mut(&mut self, i: usize) -> &mut u32 {
+    fn node_mut(&mut self, i: usize) -> &mut usize {
         &mut self.0[i]
     }
 }
@@ -400,10 +417,10 @@ impl BoundedElement for Bar2 {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Tri3([u32; 3]);
+pub struct Tri3([usize; 3]);
 
 impl Tri3 {
-    pub const fn new(i: [u32; 3]) -> Self {
+    pub const fn new(i: [usize; 3]) -> Self {
         Self(i)
     }
 }
@@ -411,11 +428,11 @@ impl Tri3 {
 impl Element for Tri3 {
     const N_NODES: usize = 3;
 
-    fn node(&self, i: usize) -> u32 {
+    fn node(&self, i: usize) -> usize {
         self.0[i]
     }
 
-    fn node_mut(&mut self, i: usize) -> &mut u32 {
+    fn node_mut(&mut self, i: usize) -> &mut usize {
         &mut self.0[i]
     }
 }
@@ -432,10 +449,10 @@ impl BoundedElement for Tri3 {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Tet4([u32; 4]);
+pub struct Tet4([usize; 4]);
 
 impl Tet4 {
-    pub const fn new(i: [u32; 4]) -> Self {
+    pub const fn new(i: [usize; 4]) -> Self {
         Self(i)
     }
 
@@ -454,11 +471,11 @@ impl Tet4 {
 impl Element for Tet4 {
     const N_NODES: usize = 4;
 
-    fn node(&self, i: usize) -> u32 {
+    fn node(&self, i: usize) -> usize {
         self.0[i]
     }
 
-    fn node_mut(&mut self, i: usize) -> &mut u32 {
+    fn node_mut(&mut self, i: usize) -> &mut usize {
         &mut self.0[i]
     }
 }
@@ -484,7 +501,7 @@ pub struct Name([u8; 32]);
 impl<'a> From<&'a str> for Name {
     fn from(s: &'a str) -> Self {
         let utf8: &[u8] = s.as_ref();
-        let slice_len = usize::max(32, utf8.len());
+        let slice_len = if utf8.len() > 32 { 32 } else { utf8.len() };
         let mut bytes = [0u8; 32];
         bytes[..slice_len].copy_from_slice(&utf8[..slice_len]);
         Self(bytes)
@@ -508,14 +525,11 @@ mod tests {
         mesh.add_vertex(Point3::new(1.0, 0.0, 0.0));
         mesh.add_vertex(Point3::new(1.0, 1.0, 0.0));
         mesh.add_vertex(Point3::new(0.0, 1.0, 0.0));
-        let mut block = Block::new();
-        block.add_elem(Tri3([0, 1, 2]));
-        block.add_elem(Tri3([0, 2, 3]));
-        let side = block.boundary();
+        mesh.add_elem(Tri3([0, 1, 2]), &[]);
+        mesh.add_elem(Tri3([0, 2, 3]), &[]);
+        let side = mesh.boundary();
         println!("{:?}", side);
         assert_eq!(side.sides().len(), 4);
-        mesh.add_block(block);
-        mesh.add_side(side);
     }
 
     #[test]
@@ -526,13 +540,10 @@ mod tests {
         mesh.add_vertex(Point3::new(1.0, 0.0, 1.0));
         mesh.add_vertex(Point3::new(1.0, 1.0, 1.0));
         let tet4 = Tet4([0, 1, 2, 3]);
-        let mut block = Block::new();
-        block.add_elem(tet4);
-        let side = block.boundary();
+        mesh.add_elem(tet4, &[]);
+        let side = mesh.boundary();
         println!("{:?}", side);
         assert_eq!(side.sides().len(), 4);
-        mesh.add_block(block);
-        mesh.add_side(side);
 
         let sum_normals = mesh.normal(&tet4.side(0))
             + mesh.normal(&tet4.side(1))
@@ -554,27 +565,24 @@ mod tests {
         mesh.add_vertex(Point3::new(0.5, 0.5, 0.5));
         mesh.add_vertex(Point3::new(-0.5, 0.5, 0.5));
 
-        let mut block = Block::new();
-        block.add_elem(Tet4::new([0, 1, 2, 5]));
-        block.add_elem(Tet4::new([0, 2, 7, 5]));
-        block.add_elem(Tet4::new([0, 7, 5, 4]));
-        block.add_elem(Tet4::new([2, 6, 7, 5]));
-        block.add_elem(Tet4::new([0, 2, 3, 7]));
+        mesh.add_elem(Tet4::new([0, 1, 2, 5]), &[]);
+        mesh.add_elem(Tet4::new([0, 2, 7, 5]), &[]);
+        mesh.add_elem(Tet4::new([0, 7, 5, 4]), &[]);
+        mesh.add_elem(Tet4::new([2, 6, 7, 5]), &[]);
+        mesh.add_elem(Tet4::new([0, 2, 3, 7]), &[]);
 
-        let side = block.boundary();
+        let side = mesh.boundary();
         println!("{:?}", side);
         assert_eq!(side.sides().len(), 12);
-        mesh.add_side(side);
 
-        let sum_volumes = mesh.volume(&block.elem(0))
-            + mesh.volume(&block.elem(1))
-            + mesh.volume(&block.elem(2))
-            + mesh.volume(&block.elem(3))
-            + mesh.volume(&block.elem(4));
+        let sum_volumes = mesh.volume(&mesh.elem(0))
+            + mesh.volume(&mesh.elem(1))
+            + mesh.volume(&mesh.elem(2))
+            + mesh.volume(&mesh.elem(3))
+            + mesh.volume(&mesh.elem(4));
 
         assert!(sum_volumes < 1.0);
         assert!(sum_volumes > 0.999999);
-        mesh.add_block(block);
     }
 
     #[test]
@@ -590,10 +598,28 @@ mod tests {
         mesh.add_vertex(Point3::new(1.0, 1.0, 1.0));
         mesh.add_vertex(Point3::new(0.0, 0.0, 0.0));
         let tet4 = Tet4([1, 3, 5, 7]);
-        let mut block = Block::new();
-        block.add_elem(tet4);
-        mesh.add_block(block);
+        mesh.add_elem(tet4, &[]);
         mesh.compact();
         assert_eq!(mesh.vertices().len(), 4);
+    }
+
+    #[test]
+    fn test_vars() {
+        let mut mesh = Mesh::new();
+        mesh.add_vertex(Point3::new(0.0, 0.0, 0.0));
+        mesh.add_vertex(Point3::new(1.0, 0.0, 0.0));
+        mesh.add_vertex(Point3::new(1.0, 1.0, 0.0));
+        mesh.add_vertex(Point3::new(0.0, 1.0, 0.0));
+        mesh.add_elem_var("color");
+        mesh.add_elem(Tri3([0, 1, 2]), &[1.0]);
+        mesh.add_elem_var("uv_x");
+        mesh.add_elem(Tri3([0, 2, 3]), &[2.0, 2.0]);
+        assert_eq!(mesh.elem_var(0)[0], 1.0);
+        assert_eq!(mesh.elem_var(1)[0], 0.0);
+        assert_eq!(mesh.elem_var(0)[1], 2.0);
+        assert_eq!(mesh.elem_var(1)[1], 2.0);
+        mesh.elem_swap_remove(0);
+        assert_eq!(mesh.elem_var(0)[0], 2.0);
+        assert_eq!(mesh.elem_var(1)[0], 2.0);
     }
 }
