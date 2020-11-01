@@ -237,36 +237,36 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
             if self.phi[d] == zero {
             } else if self.phi[b] == zero && self.phi[c] == zero {
                 let e = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([e, b, c, d]), !flipped, 1));
+                new_tets.push((Tet4::new([e, b, d, c]), flipped, 1));
             } else if self.phi[b] == zero {
                 let e = self.cut_edge(a, c);
                 let f = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([e, b, f, d]), !flipped, 2));
-                new_tets.push((Tet4::new([e, b, c, d]), !flipped, 2));
+                new_tets.push((Tet4::new([e, b, f, d]), flipped, 2));
+                new_tets.push((Tet4::new([e, b, d, c]), flipped, 2));
             } else if self.phi[c] == zero {
                 let e = self.cut_edge(a, d);
                 let f = self.cut_edge(b, d);
-                new_tets.push((Tet4::new([e, f, c, d]), !flipped, 3));
+                new_tets.push((Tet4::new([e, f, c, d]), flipped, 3));
             } else if self.phi[b] > zero && self.phi[c] < zero {
                 let e = self.cut_edge(a, c);
                 let f = self.cut_edge(a, d);
                 let g = self.cut_edge(b, c);
                 let h = self.cut_edge(b, d);
-                new_tets.push((Tet4::new([e, f, g, d]), !flipped, 4));
-                new_tets.push((Tet4::new([f, g, h, d]), !flipped, 4));
-                new_tets.push((Tet4::new([e, g, c, d]), !flipped, 4));
+                new_tets.push((Tet4::new([e, f, g, d]), flipped, 4));
+                new_tets.push((Tet4::new([f, g, d, h]), flipped, 4));
+                new_tets.push((Tet4::new([e, g, c, d]), flipped, 4));
             } else if self.phi[b] > zero && self.phi[c] > zero {
                 let e = self.cut_edge(a, d);
                 let f = self.cut_edge(b, d);
                 let g = self.cut_edge(c, d);
-                new_tets.push((Tet4::new([f, e, g, d]), !flipped, 5));
+                new_tets.push((Tet4::new([f, e, g, d]), flipped, 5));
             } else if self.phi[b] < zero && self.phi[c] < zero {
                 let e = self.cut_edge(a, b);
                 let f = self.cut_edge(a, c);
                 let g = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([g, e, c, d]), !flipped, 6));
-                new_tets.push((Tet4::new([f, e, c, g]), !flipped, 6));
-                new_tets.push((Tet4::new([e, b, c, d]), !flipped, 6));
+                new_tets.push((Tet4::new([g, e, d, c]), flipped, 6));
+                new_tets.push((Tet4::new([f, e, g, c]), flipped, 6));
+                new_tets.push((Tet4::new([e, b, d, c]), flipped, 6));
             } else {
                 panic!("unconsidered case");
             }
@@ -331,11 +331,11 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
 
     pub fn tessellate(mut self) -> Mesh<Tet4, S> {
         self.cut_lattice();
+        self.warp_vertices();
+        self.trim_spikes();
+        self.remove_exterior_tets();
+        self.mesh.compact();
         self.check_for_inverted_tets();
-        //self.warp_vertices();
-        //self.trim_spikes();
-        //self.remove_exterior_tets();
-        //self.mesh.compact();
         self.mesh
     }
 }
@@ -354,11 +354,11 @@ impl Tile {
         [0, 1, 1],
     ];
     const TETS: [Tet4; 5] = [
-        Tet4::new([0, 1, 2, 5]),
-        Tet4::new([0, 2, 7, 5]),
-        Tet4::new([0, 7, 4, 5]),
-        Tet4::new([2, 6, 7, 5]),
-        Tet4::new([0, 2, 3, 7]),
+        Tet4::new([0, 1, 5, 2]),
+        Tet4::new([0, 2, 5, 7]),
+        Tet4::new([0, 7, 5, 4]),
+        Tet4::new([2, 6, 5, 7]),
+        Tet4::new([0, 2, 7, 3]),
     ];
 }
 

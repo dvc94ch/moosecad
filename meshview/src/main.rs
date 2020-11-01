@@ -155,8 +155,8 @@ fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
             na_tex.push(na::Point2::new(elem_var as f32, 0.5));
         }
         na_faces.push(na::Point3::new(
-            i as u16 * 3 + 1,
             i as u16 * 3 + 0,
+            i as u16 * 3 + 1,
             i as u16 * 3 + 2,
         ));
         let n = mesh.normal(&elem);
