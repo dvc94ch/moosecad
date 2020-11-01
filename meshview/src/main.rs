@@ -144,7 +144,11 @@ fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
     let mut na_faces = Vec::with_capacity(mesh.elems().len());
     let mut na_normals = Vec::with_capacity(mesh.elems().len());
     for (i, elem) in mesh.elems().iter().enumerate() {
-        let elem_var = mesh.elem_var(0)[i];
+        let elem_var = if mesh.elem_vars().is_empty() {
+            0.5
+        } else {
+            mesh.elem_var(0)[i]
+        };
         for node in elem.nodes() {
             let p = mesh.vertex(node);
             na_verts.push(na::Point3::new(p[0] as f32, p[1] as f32, p[2] as f32));
