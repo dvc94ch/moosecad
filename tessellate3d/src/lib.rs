@@ -315,12 +315,27 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
         }
     }
 
+    fn check_for_inverted_tets(&self) {
+        println!("checking for inverted tets");
+        let zero = S::from_f64(0.0).unwrap();
+        for (i, tet) in self.mesh.elems().iter().enumerate() {
+            let v = self.mesh.volume(tet);
+            if v <= zero {
+                println!(
+                    "Tet #{} is inverted! volume = {} aspect = {}",
+                    i, v, self.mesh.aspect_ratio(tet),
+                );
+            }
+        }
+    }
+
     pub fn tessellate(mut self) -> Mesh<Tet4, S> {
         self.cut_lattice();
-        self.warp_vertices();
-        self.trim_spikes();
-        self.remove_exterior_tets();
-        self.mesh.compact();
+        self.check_for_inverted_tets();
+        //self.warp_vertices();
+        //self.trim_spikes();
+        //self.remove_exterior_tets();
+        //self.mesh.compact();
         self.mesh
     }
 }
@@ -380,6 +395,6 @@ mod tests {
     #[test]
     fn test_convert_mesh() {
         let f = UnitSphere::new();
-        let mesh = IsosurfaceStuffing::new(&f, 0.1, 0.2).tessellate();
+        let mesh = IsosurfaceStuffing::new(&f, 0.1).tessellate();
     }
 }
