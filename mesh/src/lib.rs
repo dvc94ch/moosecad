@@ -195,37 +195,43 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
     }
 
     pub fn length(&self, bar2: &Bar2) -> S {
-        let a = self.coords[bar2.node(0) as usize];
-        let b = self.coords[bar2.node(1) as usize];
+        let a = self.coords[bar2.node(0)];
+        let b = self.coords[bar2.node(1)];
         (b - a).magnitude()
     }
 
     pub fn normal(&self, tri3: &Tri3) -> Vector3<S> {
-        let a = self.coords[tri3.node(0) as usize];
-        let b = self.coords[tri3.node(1) as usize];
-        let c = self.coords[tri3.node(2) as usize];
+        let a = self.coords[tri3.node(0)];
+        let b = self.coords[tri3.node(1)];
+        let c = self.coords[tri3.node(2)];
         (b - a).cross(&(c - a))
     }
 
     pub fn volume(&self, tet4: &Tet4) -> S {
-        let a = self.coords[tet4.node(0) as usize];
-        let b = self.coords[tet4.node(1) as usize];
-        let c = self.coords[tet4.node(2) as usize];
-        let d = self.coords[tet4.node(3) as usize];
-        Float::abs(Matrix3::from_columns(&[a - d, b - d, c - d]).determinant())
+        let a = self.coords[tet4.node(0)];
+        let b = self.coords[tet4.node(1)];
+        let c = self.coords[tet4.node(2)];
+        let d = self.coords[tet4.node(3)];
+        Matrix3::from_columns(&[a - d, b - d, c - d]).determinant()
             / S::from_f64(6.0).unwrap()
     }
 
-    /*pub fn aspect_ratio(&self, tet4: &Tet4) -> S {
-        let mut max_length = 0.0;
-        let mut sum_normals = 0.0;
+    pub fn aspect_ratio(&self, tet4: &Tet4) -> S {
+        let mut max_length2 = S::from_f64(0.0).unwrap();
+        let mut max_cross2 = S::from_f64(0.0).unwrap();
         for tri3 in tet4.sides() {
-            sum_normals += self.normal(tri3).length();
             for bar2 in tri3.sides() {
-                max_length = f32::max(max_length, self.length(bar2));
+                let a = self.coords[bar2.node(0)].coords;
+                let b = self.coords[bar2.node(1)].coords;
+                max_length2 = Float::max(max_length2, (b - a).magnitude_squared());
+                max_cross2 = Float::max(max_cross2, a.cross(&b).magnitude_squared());
             }
         }
-    }*/
+        let max_length = Float::sqrt(max_length2);
+        let max_cross = Float::sqrt(max_cross2);
+        let volume = self.volume(tet4);
+        max_length * max_cross * S::from_f64(6.0).unwrap() / volume
+    }
 
     pub fn compact(&mut self) {
         let mut remap = vec![None; self.coords.len()];
@@ -541,6 +547,8 @@ mod tests {
         let side = mesh.boundary();
         println!("{:?}", side);
         assert_eq!(side.sides().len(), 4);
+        assert!(mesh.normal(mesh.elem(0)).magnitude() > 0.0);
+        assert!(mesh.normal(mesh.elem(1)).magnitude() > 0.0);
     }
 
     #[test]
@@ -576,11 +584,11 @@ mod tests {
         mesh.add_vertex(Point3::new(0.5, 0.5, 0.5));
         mesh.add_vertex(Point3::new(-0.5, 0.5, 0.5));
 
-        mesh.add_elem(Tet4::new([0, 1, 2, 5]), &[]);
-        mesh.add_elem(Tet4::new([0, 2, 7, 5]), &[]);
+        mesh.add_elem(Tet4::new([0, 1, 5, 2]), &[]);
+        mesh.add_elem(Tet4::new([0, 2, 5, 7]), &[]);
         mesh.add_elem(Tet4::new([0, 7, 5, 4]), &[]);
-        mesh.add_elem(Tet4::new([2, 6, 7, 5]), &[]);
-        mesh.add_elem(Tet4::new([0, 2, 3, 7]), &[]);
+        mesh.add_elem(Tet4::new([2, 6, 5, 7]), &[]);
+        mesh.add_elem(Tet4::new([0, 2, 7, 3]), &[]);
 
         let side = mesh.boundary();
         println!("{:?}", side);
