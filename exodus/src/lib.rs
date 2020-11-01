@@ -61,16 +61,18 @@ pub fn write(mesh: &Mesh<Tet4, f64>, path: &Path) -> Result<(), Error> {
     coord.put_values(&vertices, None, None)?;
 
     // block
-    let mut eb_names = file.add_variable_with_type(
-        "eb_names",
-        &["num_el_blk", "len_string"],
-        &VariableType::Basic(BasicType::Char),
-    )?;
-    eb_names.put_chars(
-        Name::from(mesh.name().unwrap_or_default()).as_ref(),
-        None,
-        None,
-    )?;
+    if let Some(name) = mesh.name() {
+        let mut eb_names = file.add_variable_with_type(
+            "eb_names",
+            &["num_el_blk", "len_string"],
+            &VariableType::Basic(BasicType::Char),
+        )?;
+        eb_names.put_chars(
+            name.as_bytes(),
+            None,
+            None,
+        )?;
+    }
 
     let mut eb_prop = file.add_variable::<i32>("eb_prop1", &["num_el_blk"])?;
     eb_prop.put_values(&[0], None, None)?;
@@ -105,7 +107,7 @@ pub fn write(mesh: &Mesh<Tet4, f64>, path: &Path) -> Result<(), Error> {
 
     for i in 0..num_elem_var {
         let mut vals_elem_var = file.add_variable::<f64>(
-            &format!("vals_elem_var{}eb1", i),
+            &format!("vals_elem_var{}eb1", i + 1),
             &["time_step", "num_el_in_blk1"],
         )?;
         vals_elem_var.put_values(mesh.elem_var(i), None, None)?;
@@ -168,10 +170,11 @@ pub fn read(path: &Path) -> Result<Mesh<Tet4, f64>, Error> {
         let d = elems[i * 4 + 3] as usize - 1;
         mesh.add_elem(Tet4::new([a, b, c, d]), &[]);
     }
-    let eb_names = file.variable("eb_names").ok_or(ExodusError)?;
-    let mut name = vec![0; len_string];
-    eb_names.raw_values(&mut name, &[0, 0], &[1, len_string])?;
-    mesh.set_name(std::str::from_utf8(&name)?);
+    if let Some(eb_names) = file.variable("eb_names") {
+        let mut name = vec![0; len_string];
+        eb_names.raw_values(&mut name, &[0, 0], &[1, len_string])?;
+        mesh.set_name(std::str::from_utf8(&name)?);
+    }
 
     if num_elem_var > 0 {
         let name_elem_var = file.variable("name_elem_var").ok_or(ExodusError)?;
@@ -181,7 +184,7 @@ pub fn read(path: &Path) -> Result<Mesh<Tet4, f64>, Error> {
             let offset = i * len_string;
             mesh.add_elem_var(std::str::from_utf8(&names[offset..(offset + len_string)])?);
             let vals_elem_var = file
-                .variable(&format!("vals_elem_var{}eb1", i))
+                .variable(&format!("vals_elem_var{}eb1", i + 1))
                 .ok_or(ExodusError)?;
             let values = vals_elem_var.values(None, None)?.into_raw_vec();
             mesh.elem_var_mut(i).copy_from_slice(&values);
