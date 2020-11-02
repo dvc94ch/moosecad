@@ -13,5 +13,8 @@ kiss3d = "0.27.0"
 mesh = { path = "../mesh" }
 nalgebra = "0.23.0"
 
+rand = "0.7.3"
+tessellate3d = { path = "../tessellate3d" }
+
 #[patch.crates-io]
 #kiss3d = { path = "../kiss3d" }

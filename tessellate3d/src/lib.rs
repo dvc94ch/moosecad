@@ -53,18 +53,28 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
     fn cut_lattice(&mut self) {
         let bbox = self.function.bbox();
         let origin = Vector3::new(bbox.min[0], bbox.min[1], bbox.min[2]);
-        let mut lattice_map = HashMap::<Vector3<u32>, usize>::new();
+        let mut lattice_map = HashMap::<Vector3<usize>, usize>::new();
+        let (mut fx, mut fy, mut fz) = (true, true, true);
+        fn transform(coord: [u32; 3], flipped: [bool; 3]) -> Vector3<usize> {
+            let x = if flipped[0] { 1 - coord[0] } else { coord[0] };
+            let y = if flipped[1] { 1 - coord[1] } else { coord[1] };
+            let z = if flipped[2] { 1 - coord[2] } else { coord[2] };
+            Vector3::new(x as usize, y as usize, z as usize)
+        }
         for x in 0..self.dim[0] {
+            fx = !fx;
             for y in 0..self.dim[1] {
+                fy = !fy;
                 for z in 0..self.dim[2] {
-                    let vi = Vector3::new(x as u32, y as u32, z as u32);
-
+                    fz = !fz;
+                    let flipped = [fx, fy, fz];
+                    let offset = Vector3::new(x, y, z);
                     for t in Tile::TETS.iter() {
                         let coordsi = [
-                            Vector3::from(Tile::LATTICE[t.node(0)]) + vi,
-                            Vector3::from(Tile::LATTICE[t.node(1)]) + vi,
-                            Vector3::from(Tile::LATTICE[t.node(2)]) + vi,
-                            Vector3::from(Tile::LATTICE[t.node(3)]) + vi,
+                            transform(Tile::LATTICE[t.node(0)], flipped) + offset,
+                            transform(Tile::LATTICE[t.node(1)], flipped) + offset,
+                            transform(Tile::LATTICE[t.node(2)], flipped) + offset,
+                            transform(Tile::LATTICE[t.node(3)], flipped) + offset,
                         ];
                         let coordss = [
                             Point3::from(
@@ -108,7 +118,11 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                                     self.phi.push(self.function.value(&coordss[i]));
                                 }
                             }
-                            self.mesh.add_elem(Tet4::new(tet), &[]);
+                            let mut tet = Tet4::new(tet);
+                            if fx ^ fy ^ fz {
+                                tet.flip();
+                            }
+                            self.mesh.add_elem(tet, &[]);
                         }
                     }
                 }
@@ -122,8 +136,8 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
         let zero = S::from_f64(0.0).unwrap();
         let one = S::from_f64(1.0).unwrap();
         let size = self.mesh.vertices().len();
-        //let warp = vec![None, size];
-        //let warp_nbr = vec![None, size];
+        let mut warp = vec![None; size];
+        //let mut warp_nbr = vec![None; size];
         let mut delta = vec![None; size];
         for tet in self.mesh.elems() {
             for edge in tet.edges() {
@@ -138,16 +152,16 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 }
                 let alpha = phi0 / (phi0 - phi1);
                 if alpha < self.warp_threshold {
-                    if delta[n0].is_none() {
-                        //let d = alpha * nalgebra::distance(x0, x1);
-                        //warp[n0] = Some(d);
+                    let d = alpha * nalgebra::distance(x0, x1);
+                    if warp[n0].is_none() || d < warp[n0].unwrap() {
+                        warp[n0] = Some(d);
                         //warp_nbr[n0] = Some(n1);
                         delta[n0] = Some((x1 - x0) * alpha);
                     }
                 } else if alpha > one - self.warp_threshold {
-                    if delta[n1].is_none() {
-                        //let d = (1.0 - alpha) * nalgebra::distance(x0, x1);
-                        //warp[n1] = Some(d);
+                    let d = (one - alpha) * nalgebra::distance(x0, x1);
+                    if warp[n1].is_none() || d < warp[n1].unwrap() {
+                        warp[n1] = Some(d);
                         //warp_nbr[n1] = Some(n0);
                         delta[n1] = Some((x0 - x1) * (one - alpha));
                     }
@@ -318,15 +332,21 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
     fn check_for_inverted_tets(&self) {
         println!("checking for inverted tets");
         let zero = S::from_f64(0.0).unwrap();
+        let one = S::from_f64(1.0).unwrap();
+        let mut aspect_ratio = (one, zero);
         for (i, tet) in self.mesh.elems().iter().enumerate() {
             let v = self.mesh.volume(tet);
+            let ar = self.mesh.aspect_ratio(tet);
             if v <= zero {
                 println!(
                     "Tet #{} is inverted! volume = {} aspect = {}",
-                    i, v, self.mesh.aspect_ratio(tet),
+                    i, v, ar,
                 );
             }
+            aspect_ratio.0 = Float::min(aspect_ratio.0, ar);
+            aspect_ratio.1 = Float::max(aspect_ratio.1, ar);
         }
+        println!("aspect_ratio: min = {} max = {}", aspect_ratio.0, aspect_ratio.1);
     }
 
     pub fn tessellate(mut self) -> Mesh<Tet4, S> {
@@ -343,7 +363,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
 pub struct Tile;
 
 impl Tile {
-    const LATTICE: [[u32; 3]; 8] = [
+    pub const LATTICE: [[u32; 3]; 8] = [
         [0, 0, 0],
         [1, 0, 0],
         [1, 1, 0],
@@ -353,7 +373,7 @@ impl Tile {
         [1, 1, 1],
         [0, 1, 1],
     ];
-    const TETS: [Tet4; 5] = [
+    pub const TETS: [Tet4; 5] = [
         Tet4::new([0, 1, 5, 2]),
         Tet4::new([0, 2, 5, 7]),
         Tet4::new([0, 7, 5, 4]),
@@ -395,6 +415,6 @@ mod tests {
     #[test]
     fn test_convert_mesh() {
         let f = UnitSphere::new();
-        let mesh = IsosurfaceStuffing::new(&f, 0.1).tessellate();
+        IsosurfaceStuffing::new(&f, 0.1).tessellate();
     }
 }

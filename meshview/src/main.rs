@@ -67,88 +67,73 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
-/*pub struct Tile;
-
-impl Tile {
-    const LATTICE: [[u32; 3]; 8] = [
-        [0, 0, 0],
-        [1, 0, 0],
-        [1, 1, 0],
-        [0, 1, 0],
-        [0, 0, 1],
-        [1, 0, 1],
-        [1, 1, 1],
-        [0, 1, 1],
-    ];
-    const TETS: [mesh::Tet4; 5] = [
-        mesh::Tet4::new([0, 1, 2, 5]),
-        mesh::Tet4::new([0, 2, 7, 5]),
-        mesh::Tet4::new([0, 7, 4, 5]),
-        mesh::Tet4::new([2, 6, 7, 5]),
-        mesh::Tet4::new([0, 2, 3, 7]),
-    ];
-}
-
-pub struct Tris;
-
-impl Tris {
-    const LATTICE: [[u32; 3]; 4] = [
-        [0, 0, 0],
-        [1, 0, 0],
-        [1, 0, 1],
-        [0, 0, 1],
-        /*[0, 0, 1],
-        [1, 0, 1],
-        [1, 1, 1],
-        [0, 1, 1],*/
-    ];
-    const TETS: [mesh::Tri3; 1] = [
-        mesh::Tri3::new([0, 1, 2]),
-        //mesh::Tri3::new([0, 2, 1]),
-        //mesh::Tri3::new([0, 2, 3]),
-    ];
-}
-
-pub struct Tets;
-
-impl Tets {
-    const LATTICE: [[i32; 3]; 5] = [
-        [0, 0, 0],
-        [1, 0, 1],
-        [0, 1, 1],
-        [-1, 0, 1],
-        [0, 0, 2],
-    ];
-    const TETS: [mesh::Tet4; 2] = [
-        mesh::Tet4::new([0, 1, 2, 3]),
-        mesh::Tet4::new([1, 2, 3, 4]),
-    ];
-}*/
-
 fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
-    /*use mesh::nalgebra::Point3;
-    let mut mesh = mesh::Mesh::new();
-    for c in Tile::LATTICE.iter() {
-        mesh.add_vertex(Point3::new(-(c[0] as f32), c[2] as f32, c[1] as f32));
-    }
-    let mut block = mesh::Block::new();
-    for t in Tile::TETS.iter() {
-        block.add_elem(*t);
-    }
-    mesh.add_block(block);
-    let mesh = mesh.boundary();*/
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
 
-    let mesh = exodus::read(path)?.to_boundary();
+    /*let mut mesh = mesh::Mesh::new();
+    mesh.add_elem_var("color");
+    let offset = tessellate3d::Tile::LATTICE.len();
+    let max = (2, 2, 2);
+
+    fn transform(coord: u32, offset: usize, flipped: bool) -> f32 {
+        (if flipped {
+            1 - coord as usize + offset
+        } else {
+            coord as usize + offset
+        }) as f32
+    }
+
+    for x in 0..max.0 {
+        let fx = x % 2 == 1;
+        for y in 0..max.1 {
+            let fy = y % 2 == 1;
+            for z in 0..max.2 {
+                let fz = z % 2 == 1;
+                for c in tessellate3d::Tile::LATTICE.iter() {
+                    let cx = transform(c[0], x, fx);
+                    let cy = transform(c[1], y, fy);
+                    let cz = transform(c[2], z, fz);
+                    mesh.add_vertex(mesh::nalgebra::Point3::new(cx, cy, cz));
+                }
+                let offset = offset * (x * max.1 * max.2 + y * max.2 + z);
+                for t in tessellate3d::Tile::TETS.iter().skip(1).take(3) {
+                    let color = rng.gen_range(0.0, 1.0);
+                    let mut tet = mesh::Tet4::new([
+                        t.node(0) + offset,
+                        t.node(1) + offset,
+                        t.node(2) + offset,
+                        t.node(3) + offset,
+                    ]);
+                    if fx ^ fy ^ fz {
+                        tet.flip();
+                    }
+                    if rng.gen_range(0.0, 1.0) > 0.2 {
+                        mesh.add_elem(tet, &[color]);
+                    }
+                }
+            }
+        }
+    }
+    let mesh = mesh.to_boundary();*/
+
+    let mut mesh = exodus::read(path)?;
+    let var = mesh.add_elem_var("color");
+    for var in mesh.elem_var_mut(var).iter_mut() {
+        *var = rng.gen_range(0.0, 1.0);
+    }
+    let mesh = mesh.to_boundary();
     let mut na_verts = Vec::with_capacity(mesh.elems().len() * 3);
     let mut na_tex = Vec::with_capacity(mesh.elems().len() * 3);
     let mut na_faces = Vec::with_capacity(mesh.elems().len());
     let mut na_normals = Vec::with_capacity(mesh.elems().len());
     for (i, elem) in mesh.elems().iter().enumerate() {
-        let elem_var = if mesh.elem_vars().is_empty() {
+        /*let elem_var = if mesh.elem_vars().is_empty() {
             0.5
         } else {
             mesh.elem_var(0)[i]
-        };
+        };*/
+        let elem_var = mesh.elem_var(0)[i];
         for node in elem.nodes() {
             let p = mesh.vertex(node);
             na_verts.push(na::Point3::new(p[0] as f32, p[1] as f32, p[2] as f32));

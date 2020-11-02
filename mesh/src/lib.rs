@@ -194,10 +194,14 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
         &mut self.side_sets
     }
 
-    pub fn length(&self, bar2: &Bar2) -> S {
+    pub fn diff(&self, bar2: &Bar2) -> Vector3<S> {
         let a = self.coords[bar2.node(0)];
         let b = self.coords[bar2.node(1)];
-        (b - a).magnitude()
+        b - a
+    }
+
+    pub fn length(&self, bar2: &Bar2) -> S {
+        self.diff(bar2).magnitude()
     }
 
     pub fn normal(&self, tri3: &Tri3) -> Vector3<S> {
@@ -218,19 +222,20 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
 
     pub fn aspect_ratio(&self, tet4: &Tet4) -> S {
         let mut max_length2 = S::from_f64(0.0).unwrap();
-        let mut max_cross2 = S::from_f64(0.0).unwrap();
-        for tri3 in tet4.sides() {
-            for bar2 in tri3.sides() {
-                let a = self.coords[bar2.node(0)].coords;
-                let b = self.coords[bar2.node(1)].coords;
-                max_length2 = Float::max(max_length2, (b - a).magnitude_squared());
-                max_cross2 = Float::max(max_cross2, a.cross(&b).magnitude_squared());
-            }
+        let mut sum_normals = S::from_f64(0.0).unwrap();
+        let ab = self.diff(&tet4.edge(0));
+        let ac = self.diff(&tet4.edge(1));
+        let ad = self.diff(&tet4.edge(2));
+        let alpha = Float::abs(ab.dot(&ac.cross(&ad)));
+        for tri in tet4.sides() {
+            sum_normals += self.normal(&tri).magnitude();
+        }
+        for edge in tet4.edges() {
+            max_length2 = Float::max(max_length2, self.diff(&edge).magnitude_squared());
         }
         let max_length = Float::sqrt(max_length2);
-        let max_cross = Float::sqrt(max_cross2);
-        let volume = self.volume(tet4);
-        max_length * max_cross * S::from_f64(6.0).unwrap() / volume
+        let radius = alpha / sum_normals;
+        S::from_f64(1.0).unwrap() / (max_length / radius / S::from_f64(2.0 * 6.0.sqrt()).unwrap())
     }
 
     pub fn compact(&mut self) {
@@ -477,6 +482,12 @@ impl Tet4 {
             .iter()
             .map(move |indices| Bar2([self.node(indices[0]), self.node(indices[1])]))
     }
+
+    pub fn flip(&mut self) {
+        let a = self.0[0];
+        self.0[0] = self.0[1];
+        self.0[1] = a;
+    }
 }
 
 impl Element for Tet4 {
@@ -640,5 +651,16 @@ mod tests {
         mesh.elem_swap_remove(0);
         assert_eq!(mesh.elem_var(0)[0], 2.0);
         assert_eq!(mesh.elem_var(1)[0], 2.0);
+    }
+
+    #[test]
+    fn test_aspect_ratio() {
+        let mut mesh = Mesh::new();
+        mesh.add_vertex(Point3::new(1.0, 1.0, 1.0));
+        mesh.add_vertex(Point3::new(-1.0, -1.0, 1.0));
+        mesh.add_vertex(Point3::new(-1.0, 1.0, -1.0));
+        mesh.add_vertex(Point3::new(1.0, -1.0, -1.0));
+        mesh.add_elem(Tet4::new([0, 1, 3, 2]), &[]);
+        assert_eq!(mesh.aspect_ratio(mesh.elem(0)), 1.0);
     }
 }
