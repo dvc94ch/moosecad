@@ -24,6 +24,7 @@ pub trait ImplicitFunction<S: RealField> {
 pub struct IsosurfaceStuffing<'a, S: RealField> {
     function: &'a dyn ImplicitFunction<S>,
     resolution: S,
+    error_threshold: S,
     warp_threshold: S,
     dim: [usize; 3],
     mesh: Mesh<Tet4, S>,
@@ -32,11 +33,12 @@ pub struct IsosurfaceStuffing<'a, S: RealField> {
 }
 
 impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> IsosurfaceStuffing<'a, S> {
-    pub fn new(function: &'a dyn ImplicitFunction<S>, resolution: S) -> Self {
+    pub fn new(function: &'a dyn ImplicitFunction<S>, resolution: S, relative_error: S) -> Self {
         let bbox = function.bbox();
         Self {
             function,
             resolution,
+            error_threshold: resolution * relative_error,
             warp_threshold: S::from_f64(0.3).unwrap(),
             dim: [
                 Float::ceil(bbox.dim()[0] / resolution).to_usize().unwrap(),
@@ -179,7 +181,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
     /// Interpolates the point where two coordinates intersect the boundary of the function.
     fn cut_edge(&mut self, a: usize, b: usize) -> usize {
         let zero = S::from_f64(0.0).unwrap();
-        let one = S::from_f64(1.0).unwrap();
+        let one = S::from_f64(0.5).unwrap();
         debug_assert!(
             self.phi[a] > zero && self.phi[b] < zero || self.phi[a] < zero && self.phi[b] > zero
         );
@@ -187,11 +189,27 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
         if let Some(i) = self.cut_map.get(&edge) {
             return *i;
         }
-        let alpha = self.phi[a] / self.phi[a] - self.phi[b];
-        let vertex =
-            self.mesh.vertex(a).coords * (one - alpha) + self.mesh.vertex(b).coords * alpha;
+        let mut phia = self.phi[a];
+        let mut phib = self.phi[b];
+        let mut a = self.mesh.vertex(a).coords;
+        let mut b = self.mesh.vertex(b).coords;
+        let c = loop {
+            let c = Point3::from((a + b) * one);
+            let phi = self.function.value(&c);
+
+            if Float::abs(phi) <= self.error_threshold {
+                break c;
+            } else if phi > zero && phia > zero {
+                a = c.coords;
+                phia = phi;
+            } else {
+                b = c.coords;
+                phib = phi;
+            }
+        };
+
         let index = self.mesh.vertices().len();
-        self.mesh.add_vertex(Point3::from(vertex));
+        self.mesh.add_vertex(c);
         self.phi.push(zero);
         self.cut_map.insert(edge, index);
         index
@@ -260,7 +278,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 let ad = self.cut_edge(a, d);
                 let bd = self.cut_edge(b, d);
                 let cd = self.cut_edge(c, d);
-                new_tets.push((Tet4::new([ad, bd, cd, d]), !flipped, 6));
+                new_tets.push((Tet4::new([ad, bd, cd, d]), flipped, 6));
             } else if self.phi[b] < zero {
                 // only a outside of the volume
                 self.mesh.elem_swap_remove(ti);
@@ -269,9 +287,9 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 let ab = self.cut_edge(a, b);
                 let ac = self.cut_edge(a, c);
                 let ad = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([ab, b, c, d]), !flipped, 6));
+                new_tets.push((Tet4::new([ab, b, c, d]), flipped, 6));
                 new_tets.push((Tet4::new([c, ab, ac, d]), flipped, 6));
-                new_tets.push((Tet4::new([ab, d, ac, ad]), !flipped, 6));
+                new_tets.push((Tet4::new([ab, d, ac, ad]), flipped, 6));
             } else if self.phi[b] > zero && self.phi[c] < zero {
                 // 1 out, 2 in
                 self.mesh.elem_swap_remove(ti);
@@ -290,7 +308,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 stats[4] += 1;
 
                 let ad = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([ad, b, c, d]), !flipped, 6));
+                new_tets.push((Tet4::new([ad, b, c, d]), flipped, 6));
             } else if self.phi[b] == zero {
                 // 1 out, 2 in, 1 surface
                 self.mesh.elem_swap_remove(ti);
@@ -299,7 +317,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 let ac = self.cut_edge(a, c);
                 let ad = self.cut_edge(a, d);
                 new_tets.push((Tet4::new([b, ac, c, d]), flipped, 6));
-                new_tets.push((Tet4::new([ad, b, ac, d]), !flipped, 6));
+                new_tets.push((Tet4::new([ad, b, ac, d]), flipped, 6));
             } else {
                 // two out, one in, one surface
                 self.mesh.elem_swap_remove(ti);
@@ -320,7 +338,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 *tet.node_mut(1) = a;
             }
             self.mesh
-                .add_elem(tet, &[S::from_f64(ty as f64 / 6.0).unwrap()]);
+                .add_elem(tet, &[S::from_f64(ty as _).unwrap()]);
         }
         println!("num tets {}", self.mesh.elems().len());
     }
@@ -433,7 +451,7 @@ mod tests {
         }
 
         fn value(&self, p: &Point3<f64>) -> f64 {
-            p.coords.norm() - 1.0
+            p.coords.magnitude_squared() - 1.0
         }
 
         fn normal(&self, p: &Point3<f64>) -> Vector3<f64> {
@@ -444,6 +462,22 @@ mod tests {
     #[test]
     fn test_convert_mesh() {
         let f = UnitSphere::new();
-        IsosurfaceStuffing::new(&f, 0.1).tessellate();
+        IsosurfaceStuffing::new(&f, 0.1, 0.2).tessellate();
+    }
+
+    #[test]
+    fn test_cut_edge() {
+        let mut mesh = Mesh::new();
+        mesh.add_vertex(Point3::new(-1.5, 0.0, 0.0));
+        mesh.add_vertex(Point3::new(-0.4, 0.0, 0.0));
+        let f = UnitSphere::new();
+        let mut i = IsosurfaceStuffing::new(&f, 0.1, 0.0001);
+        i.phi = vec![f.value(mesh.vertex(0)), f.value(mesh.vertex(1))];
+        i.mesh = mesh;
+        assert_eq!(i.cut_edge(0, 1), 2);
+        println!("phi {:?}", i.phi);
+        println!("verts {:?}", i.mesh.vertices());
+        println!("{}", f.value(i.mesh.vertex(2)));
+        assert_eq!(*i.mesh.vertex(2), Point3::new(-1.0, 0.0, 0.0));
     }
 }

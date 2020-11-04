@@ -133,7 +133,11 @@ fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
         } else {
             mesh.elem_var(0)[i]
         };*/
-        let elem_var = mesh.elem_var(0)[i];
+        let elem_var = if mesh.elem_var(0)[i] > 5.0 {
+            rng.gen_range(0.1, 1.0)
+        } else {
+            0.0
+        };
         for node in elem.nodes() {
             let p = mesh.vertex(node);
             na_verts.push(na::Point3::new(p[0] as f32, p[1] as f32, p[2] as f32));
