@@ -202,6 +202,8 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
         let zero = S::from_f64(0.0).unwrap();
         let mut new_tets = Vec::new();
         let mut ti = 0;
+        let mut stats = [0; 7];
+        println!("num tets {}", self.mesh.elems().len());
         while ti < self.mesh.elems().len() {
             let mut a = self.mesh.elem(ti).node(0);
             let mut b = self.mesh.elem(ti).node(1);
@@ -246,46 +248,70 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
             debug_assert!(self.phi[a] > zero);
             debug_assert!(self.phi[d] <= zero);
 
-            self.mesh.elem_swap_remove(ti);
-
             if self.phi[d] == zero {
-            } else if self.phi[b] == zero && self.phi[c] == zero {
-                let e = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([e, b, d, c]), flipped, 1));
-            } else if self.phi[b] == zero {
-                let e = self.cut_edge(a, c);
-                let f = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([e, b, f, d]), flipped, 2));
-                new_tets.push((Tet4::new([e, b, d, c]), flipped, 2));
-            } else if self.phi[c] == zero {
-                let e = self.cut_edge(a, d);
-                let f = self.cut_edge(b, d);
-                new_tets.push((Tet4::new([e, f, c, d]), flipped, 3));
+                // tet outside of the volume
+                self.mesh.elem_swap_remove(ti);
+                stats[0] += 1;
+            } else if self.phi[c] > zero {
+                // only d inside the volume
+                self.mesh.elem_swap_remove(ti);
+                stats[1] += 1;
+
+                let ad = self.cut_edge(a, d);
+                let bd = self.cut_edge(b, d);
+                let cd = self.cut_edge(c, d);
+                new_tets.push((Tet4::new([ad, bd, cd, d]), !flipped, 6));
+            } else if self.phi[b] < zero {
+                // only a outside of the volume
+                self.mesh.elem_swap_remove(ti);
+                stats[2] += 1;
+
+                let ab = self.cut_edge(a, b);
+                let ac = self.cut_edge(a, c);
+                let ad = self.cut_edge(a, d);
+                new_tets.push((Tet4::new([ab, b, c, d]), !flipped, 6));
+                new_tets.push((Tet4::new([c, ab, ac, d]), flipped, 6));
+                new_tets.push((Tet4::new([ab, d, ac, ad]), !flipped, 6));
             } else if self.phi[b] > zero && self.phi[c] < zero {
-                let e = self.cut_edge(a, c);
-                let f = self.cut_edge(a, d);
-                let g = self.cut_edge(b, c);
-                let h = self.cut_edge(b, d);
-                new_tets.push((Tet4::new([e, f, g, d]), flipped, 4));
-                new_tets.push((Tet4::new([f, g, d, h]), flipped, 4));
-                new_tets.push((Tet4::new([e, g, c, d]), flipped, 4));
-            } else if self.phi[b] > zero && self.phi[c] > zero {
-                let e = self.cut_edge(a, d);
-                let f = self.cut_edge(b, d);
-                let g = self.cut_edge(c, d);
-                new_tets.push((Tet4::new([f, e, g, d]), flipped, 5));
-            } else if self.phi[b] < zero && self.phi[c] < zero {
-                let e = self.cut_edge(a, b);
-                let f = self.cut_edge(a, c);
-                let g = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([g, e, d, c]), flipped, 6));
-                new_tets.push((Tet4::new([f, e, g, c]), flipped, 6));
-                new_tets.push((Tet4::new([e, b, d, c]), flipped, 6));
+                // 1 out, 2 in
+                self.mesh.elem_swap_remove(ti);
+                stats[3] += 1;
+
+                let ac = self.cut_edge(a, c);
+                let ad = self.cut_edge(a, d);
+                let bc = self.cut_edge(b, c);
+                let bd = self.cut_edge(b, d);
+                new_tets.push((Tet4::new([ac, bd, c, d]), flipped, 6));
+                new_tets.push((Tet4::new([ac, bd, bc, d]), flipped, 6));
+                new_tets.push((Tet4::new([ac, ad, bd, d]), flipped, 6));
+            } else if self.phi[b] == zero && self.phi[c] == zero {
+                // 1 out, 1 in, 2 surface
+                self.mesh.elem_swap_remove(ti);
+                stats[4] += 1;
+
+                let ad = self.cut_edge(a, d);
+                new_tets.push((Tet4::new([ad, b, c, d]), !flipped, 6));
+            } else if self.phi[b] == zero {
+                // 1 out, 2 in, 1 surface
+                self.mesh.elem_swap_remove(ti);
+                stats[5] += 1;
+
+                let ac = self.cut_edge(a, c);
+                let ad = self.cut_edge(a, d);
+                new_tets.push((Tet4::new([b, ac, c, d]), flipped, 6));
+                new_tets.push((Tet4::new([ad, b, ac, d]), !flipped, 6));
             } else {
-                panic!("unconsidered case");
+                // two out, one in, one surface
+                self.mesh.elem_swap_remove(ti);
+                stats[6] += 1;
+
+                let ad = self.cut_edge(a, d);
+                let bd = self.cut_edge(b, d);
+                new_tets.push((Tet4::new([ad, bd, c, d]), flipped, 6));
             }
         }
 
+        println!("stats {:?}", stats);
         self.mesh.add_elem_var("tet_type");
         for (mut tet, flipped, ty) in new_tets.drain(..) {
             if flipped {
@@ -296,6 +322,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
             self.mesh
                 .add_elem(tet, &[S::from_f64(ty as f64 / 6.0).unwrap()]);
         }
+        println!("num tets {}", self.mesh.elems().len());
     }
 
     /// Remove tets with corners where phi = 0 but are outside the volume.
@@ -351,7 +378,9 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
 
     pub fn tessellate(mut self) -> Mesh<Tet4, S> {
         self.cut_lattice();
+        println!("num tets {}", self.mesh.elems().len());
         self.warp_vertices();
+        println!("num tets {}", self.mesh.elems().len());
         self.trim_spikes();
         self.remove_exterior_tets();
         self.mesh.compact();
