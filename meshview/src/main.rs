@@ -68,6 +68,7 @@ fn main() -> Result<(), Error> {
 }
 
 fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
+    use mesh::BoundedElement;
     use rand::Rng;
     let mut rng = rand::thread_rng();
 
@@ -122,7 +123,9 @@ fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
     for var in mesh.elem_var_mut(var).iter_mut() {
         *var = rng.gen_range(0.0, 1.0);
     }
+    println!("num tet {}", mesh.elems().len());
     let mesh = mesh.to_boundary();
+    println!("num tri {}", mesh.elems().len());
     let mut na_verts = Vec::with_capacity(mesh.elems().len() * 3);
     let mut na_tex = Vec::with_capacity(mesh.elems().len() * 3);
     let mut na_faces = Vec::with_capacity(mesh.elems().len());
@@ -133,23 +136,23 @@ fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
         } else {
             mesh.elem_var(0)[i]
         };*/
-        let elem_var = if mesh.elem_var(0)[i] > 5.0 {
-            rng.gen_range(0.1, 1.0)
-        } else {
-            0.0
-        };
-        for node in elem.nodes() {
-            let p = mesh.vertex(node);
-            na_verts.push(na::Point3::new(p[0] as f32, p[1] as f32, p[2] as f32));
-            na_tex.push(na::Point2::new(elem_var as f32, 0.5));
-        }
-        na_faces.push(na::Point3::new(
-            i as u16 * 3 + 0,
-            i as u16 * 3 + 1,
-            i as u16 * 3 + 2,
-        ));
-        let n = mesh.normal(&elem);
-        na_normals.push(na::Vector3::new(n[0] as f32, n[1] as f32, n[2] as f32));
+        let elem_var = mesh.elem_var(var)[i];
+
+        //for elem in elem.sides() {
+            let i = na_verts.len();
+            for node in elem.nodes() {
+                let p = mesh.vertex(node);
+                na_verts.push(na::Point3::new(p[0] as f32, p[1] as f32, p[2] as f32));
+                na_tex.push(na::Point2::new(elem_var as f32, 0.5));
+            }
+            na_faces.push(na::Point3::new(
+                i as u16 + 0,
+                i as u16 + 1,
+                i as u16 + 2,
+            ));
+            let n = mesh.normal(&elem);
+            na_normals.push(na::Vector3::new(n[0] as f32, n[1] as f32, n[2] as f32));
+        //}
     }
     let mesh = Mesh::new(na_verts, na_faces, Some(na_normals), Some(na_tex), true);
     Ok(Rc::new(RefCell::new(mesh)))

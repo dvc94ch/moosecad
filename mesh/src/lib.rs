@@ -508,7 +508,7 @@ impl BoundedElement for Tet4 {
     type Side = Tri3;
 
     fn side(&self, i: usize) -> Self::Side {
-        let indices = [[0, 1, 2], [0, 3, 1], [1, 3, 2], [2, 3, 0]][i];
+        let indices = [[0, 1, 2], [0, 2, 3], [0, 3, 1], [1, 3, 2]][i];
         Tri3([
             self.node(indices[0]),
             self.node(indices[1]),
