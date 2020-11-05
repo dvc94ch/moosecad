@@ -4,7 +4,7 @@ use inotify::{Inotify, WatchMask};
 use kiss3d::light::Light;
 use kiss3d::resource::Mesh;
 use kiss3d::window::Window;
-use mesh::Element;
+use mesh::Element1;
 use nalgebra as na;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -68,7 +68,7 @@ fn main() -> Result<(), Error> {
 }
 
 fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
-    use mesh::BoundedElement;
+    //use mesh::BoundedElement;
     use rand::Rng;
     let mut rng = rand::thread_rng();
 

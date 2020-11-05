@@ -1,5 +1,5 @@
 pub use bbox::BoundingBox;
-use mesh::{Element, Mesh, Tet4};
+use mesh::{Element1, Element2, Mesh, Tet4};
 use nalgebra::{Point3, RealField, Vector3};
 use num_traits::Float;
 use std::collections::HashMap;
@@ -181,7 +181,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
     /// Interpolates the point where two coordinates intersect the boundary of the function.
     fn cut_edge(&mut self, a: usize, b: usize) -> usize {
         let zero = S::from_f64(0.0).unwrap();
-        let one = S::from_f64(0.5).unwrap();
+        let half = S::from_f64(0.5).unwrap();
         debug_assert!(
             self.phi[a] > zero && self.phi[b] < zero || self.phi[a] < zero && self.phi[b] > zero
         );
@@ -193,7 +193,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
         let mut a = self.mesh.vertex(a).coords;
         let mut b = self.mesh.vertex(b).coords;
         let c = loop {
-            let c = Point3::from((a + b) * one);
+            let c = Point3::from((a + b) * half);
             let phi = self.function.value(&c);
 
             if Float::abs(phi) <= self.error_threshold {
@@ -475,6 +475,7 @@ mod tests {
         println!("phi {:?}", i.phi);
         println!("verts {:?}", i.mesh.vertices());
         println!("{}", f.value(i.mesh.vertex(2)));
-        assert_eq!(*i.mesh.vertex(2), Point3::new(-1.0, 0.0, 0.0));
+        let error = (*i.mesh.vertex(2) - Point3::new(-1.0, 0.0, 0.0)).magnitude();
+        assert!(error < 0.00001);
     }
 }

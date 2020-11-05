@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 pub use nalgebra;
 pub use num_traits;
 
-pub trait Element: Copy + Debug + Eq {
+pub trait Element1: Copy + Debug + Eq {
     const N_NODES: usize;
     fn node(&self, i: usize) -> usize;
     fn node_mut(&mut self, i: usize) -> &mut usize;
@@ -17,11 +17,34 @@ pub trait Element: Copy + Debug + Eq {
     fn nodes_mut(&mut self) -> NodeIterMut<'_, Self> {
         NodeIterMut::new(self)
     }
+    fn flip(&mut self) {
+        let a = self.node(0);
+        *self.node_mut(0) = self.node(1);
+        *self.node_mut(1) = a;
+    }
 }
 
-pub trait BoundedElement: Element {
+pub trait Element2: Element1 {
+    const N_EDGES: usize;
+    type Edge: Element1;
+    fn edge(&self, i: usize) -> Self::Edge;
+    fn edges(&self) -> EdgeIter<'_, Self> {
+        EdgeIter::new(self)
+    }
+}
+
+pub trait Element3: Element2 {
+    const N_FACES: usize;
+    type Face: Element2;
+    fn face(&self, i: usize) -> Self::Face;
+    fn faces(&self) -> FaceIter<'_, Self> {
+        FaceIter::new(self)
+    }
+}
+
+pub trait BoundedElement: Element1 {
     const N_SIDES: usize;
-    type Side: Element;
+    type Side: Element1;
     fn side(&self, i: usize) -> Self::Side;
     fn sides(&self) -> SideIter<'_, Self> {
         SideIter::new(self)
@@ -310,13 +333,13 @@ pub struct NodeIter<'a, E> {
     i: usize,
 }
 
-impl<'a, E: Element> NodeIter<'a, E> {
+impl<'a, E: Element1> NodeIter<'a, E> {
     pub fn new(elem: &'a E) -> Self {
         Self { elem, i: 0 }
     }
 }
 
-impl<'a, E: Element> Iterator for NodeIter<'a, E> {
+impl<'a, E: Element1> Iterator for NodeIter<'a, E> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -335,13 +358,13 @@ pub struct NodeIterMut<'a, E> {
     i: usize,
 }
 
-impl<'a, E: Element> NodeIterMut<'a, E> {
+impl<'a, E: Element1> NodeIterMut<'a, E> {
     pub fn new(elem: &'a mut E) -> Self {
         Self { elem, i: 0 }
     }
 }
 
-impl<'a, E: Element> Iterator for NodeIterMut<'a, E> {
+impl<'a, E: Element1> Iterator for NodeIterMut<'a, E> {
     type Item = &'a mut usize;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -349,6 +372,56 @@ impl<'a, E: Element> Iterator for NodeIterMut<'a, E> {
             let i = self.i;
             self.i += 1;
             Some(unsafe { &mut *(self.elem.node_mut(i) as *mut _) })
+        } else {
+            None
+        }
+    }
+}
+
+pub struct EdgeIter<'a, E> {
+    elem: &'a E,
+    i: usize,
+}
+
+impl<'a, E: Element2> EdgeIter<'a, E> {
+    pub fn new(elem: &'a E) -> Self {
+        Self { elem, i: 0 }
+    }
+}
+
+impl<'a, E: Element2> Iterator for EdgeIter<'a, E> {
+    type Item = E::Edge;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.i < E::N_EDGES {
+            let res = Some(self.elem.edge(self.i));
+            self.i += 1;
+            res
+        } else {
+            None
+        }
+    }
+}
+
+pub struct FaceIter<'a, E> {
+    elem: &'a E,
+    i: usize,
+}
+
+impl<'a, E: Element3> FaceIter<'a, E> {
+    pub fn new(elem: &'a E) -> Self {
+        Self { elem, i: 0 }
+    }
+}
+
+impl<'a, E: Element3> Iterator for FaceIter<'a, E> {
+    type Item = E::Face;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.i < E::N_FACES {
+            let res = Some(self.elem.face(self.i));
+            self.i += 1;
+            res
         } else {
             None
         }
@@ -380,25 +453,15 @@ impl<'a, E: BoundedElement> Iterator for SideIter<'a, E> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Node1([usize; 1]);
-
-impl Node1 {
-    pub const fn new(i: [usize; 1]) -> Self {
-        Self(i)
-    }
-}
-
-impl Element for Node1 {
+impl Element1 for usize {
     const N_NODES: usize = 1;
-
-    fn node(&self, i: usize) -> usize {
-        self.0[i]
+    fn node(&self, _: usize) -> usize {
+        *self
     }
-
-    fn node_mut(&mut self, i: usize) -> &mut usize {
-        &mut self.0[i]
+    fn node_mut(&mut self, _: usize) -> &mut usize {
+        self
     }
+    fn flip(&mut self) {}
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -410,7 +473,7 @@ impl Bar2 {
     }
 }
 
-impl Element for Bar2 {
+impl Element1 for Bar2 {
     const N_NODES: usize = 2;
 
     fn node(&self, i: usize) -> usize {
@@ -425,10 +488,10 @@ impl Element for Bar2 {
 impl BoundedElement for Bar2 {
     const N_SIDES: usize = 2;
 
-    type Side = Node1;
+    type Side = usize;
 
     fn side(&self, i: usize) -> Self::Side {
-        Node1([self.0[i]])
+        self.0[i]
     }
 }
 
@@ -441,7 +504,7 @@ impl Tri3 {
     }
 }
 
-impl Element for Tri3 {
+impl Element1 for Tri3 {
     const N_NODES: usize = 3;
 
     fn node(&self, i: usize) -> usize {
@@ -453,14 +516,24 @@ impl Element for Tri3 {
     }
 }
 
+impl Element2 for Tri3 {
+    const N_EDGES: usize = 3;
+
+    type Edge = Bar2;
+
+    fn edge(&self, i: usize) -> Self::Edge {
+        let indices = [[0, 1], [1, 2], [2, 0]][i];
+        Bar2([self.node(indices[0]), self.node(indices[1])])
+    }
+}
+
 impl BoundedElement for Tri3 {
     const N_SIDES: usize = 3;
 
     type Side = Bar2;
 
     fn side(&self, i: usize) -> Self::Side {
-        let indices = [[0, 1], [1, 2], [2, 0]][i];
-        Bar2([self.node(indices[0]), self.node(indices[1])])
+        self.edge(i)
     }
 }
 
@@ -471,26 +544,9 @@ impl Tet4 {
     pub const fn new(i: [usize; 4]) -> Self {
         Self(i)
     }
-
-    pub fn edge(&self, i: usize) -> Bar2 {
-        let indices = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]][i];
-        Bar2([self.node(indices[0]), self.node(indices[1])])
-    }
-
-    pub fn edges(&self) -> impl Iterator<Item = Bar2> + '_ {
-        [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]
-            .iter()
-            .map(move |indices| Bar2([self.node(indices[0]), self.node(indices[1])]))
-    }
-
-    pub fn flip(&mut self) {
-        let a = self.0[0];
-        self.0[0] = self.0[1];
-        self.0[1] = a;
-    }
 }
 
-impl Element for Tet4 {
+impl Element1 for Tet4 {
     const N_NODES: usize = 4;
 
     fn node(&self, i: usize) -> usize {
@@ -502,18 +558,39 @@ impl Element for Tet4 {
     }
 }
 
-impl BoundedElement for Tet4 {
-    const N_SIDES: usize = 4;
+impl Element2 for Tet4 {
+    const N_EDGES: usize = 6;
 
-    type Side = Tri3;
+    type Edge = Bar2;
 
-    fn side(&self, i: usize) -> Self::Side {
+    fn edge(&self, i: usize) -> Bar2 {
+        let indices = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]][i];
+        Bar2([self.node(indices[0]), self.node(indices[1])])
+    }
+}
+
+impl Element3 for Tet4 {
+    const N_FACES: usize = 4;
+
+    type Face = Tri3;
+
+    fn face(&self, i: usize) -> Self::Face {
         let indices = [[0, 1, 2], [0, 2, 3], [0, 3, 1], [1, 3, 2]][i];
         Tri3([
             self.node(indices[0]),
             self.node(indices[1]),
             self.node(indices[2]),
         ])
+    }
+}
+
+impl BoundedElement for Tet4 {
+    const N_SIDES: usize = 4;
+
+    type Side = Tri3;
+
+    fn side(&self, i: usize) -> Self::Side {
+        self.face(i)
     }
 }
 

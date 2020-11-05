@@ -1,5 +1,5 @@
 use anyhow::Error;
-use mesh::{Element, Mesh, Name, Tet4};
+use mesh::{Element1, Mesh, Name, Tet4};
 use nalgebra::Point3;
 use netcdf::attribute::AttrValue;
 use netcdf::types::{BasicType, VariableType};
