@@ -56,17 +56,19 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
         let bbox = self.function.bbox();
         let origin = Vector3::new(bbox.min[0], bbox.min[1], bbox.min[2]);
         let mut lattice_map = HashMap::<Vector3<usize>, usize>::new();
-        let (mut fx, mut fy, mut fz) = (true, true, true);
         fn transform(coord: [u32; 3], flipped: [bool; 3]) -> Vector3<usize> {
             let x = if flipped[0] { 1 - coord[0] } else { coord[0] };
             let y = if flipped[1] { 1 - coord[1] } else { coord[1] };
             let z = if flipped[2] { 1 - coord[2] } else { coord[2] };
             Vector3::new(x as usize, y as usize, z as usize)
         }
+        let mut fx = true;
         for x in 0..self.dim[0] {
             fx = !fx;
+            let mut fy = true;
             for y in 0..self.dim[1] {
                 fy = !fy;
+                let mut fz = true;
                 for z in 0..self.dim[2] {
                     fz = !fz;
                     let flipped = [fx, fy, fz];
@@ -179,7 +181,8 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
     }
 
     /// Interpolates the point where two coordinates intersect the boundary of the function.
-    fn cut_edge(&mut self, a: usize, b: usize) -> usize {
+    #[allow(unused)]
+    fn cut_edge_bisect(&mut self, a: usize, b: usize) -> usize {
         let zero = S::from_f64(0.0).unwrap();
         let half = S::from_f64(0.5).unwrap();
         debug_assert!(
@@ -276,7 +279,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 let ad = self.cut_edge(a, d);
                 let bd = self.cut_edge(b, d);
                 let cd = self.cut_edge(c, d);
-                new_tets.push((Tet4::new([ad, bd, cd, d]), flipped, 6));
+                new_tets.push((Tet4::new([ad, bd, cd, d]), flipped, 1));
             } else if self.phi[b] < zero {
                 // only a outside of the volume
                 self.mesh.elem_swap_remove(ti);
@@ -285,9 +288,9 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 let ab = self.cut_edge(a, b);
                 let ac = self.cut_edge(a, c);
                 let ad = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([ab, b, c, d]), flipped, 6));
-                new_tets.push((Tet4::new([c, ab, ac, d]), !flipped, 6));
-                new_tets.push((Tet4::new([ab, d, ac, ad]), flipped, 6));
+                new_tets.push((Tet4::new([ab, b, c, d]), flipped, 2));
+                new_tets.push((Tet4::new([c, ab, ac, d]), !flipped, 2));
+                new_tets.push((Tet4::new([ab, d, ac, ad]), flipped, 2));
             } else if self.phi[b] > zero && self.phi[c] < zero {
                 // 1 out, 2 in
                 self.mesh.elem_swap_remove(ti);
@@ -306,7 +309,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 stats[4] += 1;
 
                 let ad = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([ad, b, c, d]), flipped, 6));
+                new_tets.push((Tet4::new([ad, b, c, d]), flipped, 4));
             } else if self.phi[b] == zero {
                 // 1 out, 2 in, 1 surface
                 self.mesh.elem_swap_remove(ti);
@@ -314,8 +317,8 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
 
                 let ac = self.cut_edge(a, c);
                 let ad = self.cut_edge(a, d);
-                new_tets.push((Tet4::new([b, ac, c, d]), !flipped, 6));
-                new_tets.push((Tet4::new([ad, b, ac, d]), flipped, 6));
+                new_tets.push((Tet4::new([b, ac, c, d]), !flipped, 5));
+                new_tets.push((Tet4::new([ad, b, ac, d]), flipped, 5));
             } else {
                 // two out, one in, one surface
                 self.mesh.elem_swap_remove(ti);
@@ -336,7 +339,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
                 *tet.node_mut(1) = a;
             }
             self.mesh
-                .add_elem(tet, &[S::from_f64(ty as _).unwrap()]);
+                .add_elem(tet, &[S::from_f64(ty as f64 / 6.0).unwrap()]);
         }
         println!("num tets {}", self.mesh.elems().len());
     }
@@ -393,7 +396,9 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
     }
 
     pub fn tessellate(mut self) -> Mesh<Tet4, S> {
+        println!("dim {:?}", self.dim);
         self.cut_lattice();
+        //println!("self intersections {}", self.mesh.edge_intersections());
         println!("num tets {}", self.mesh.elems().len());
         self.warp_vertices();
         self.trim_spikes();

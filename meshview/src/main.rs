@@ -69,8 +69,8 @@ fn main() -> Result<(), Error> {
 
 fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
     //use mesh::BoundedElement;
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
+    //use rand::Rng;
+    //let mut rng = rand::thread_rng();
 
     /*let mut mesh = mesh::Mesh::new();
     mesh.add_elem_var("color");
@@ -118,11 +118,11 @@ fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
     }
     let mesh = mesh.to_boundary();*/
 
-    let mut mesh = exodus::read(path)?;
-    let var = mesh.add_elem_var("color");
+    let mesh = exodus::read(path)?;
+    /*let var = mesh.add_elem_var("color");
     for var in mesh.elem_var_mut(var).iter_mut() {
         *var = rng.gen_range(0.0, 1.0);
-    }
+    }*/
     println!("num tet {}", mesh.elems().len());
     let mesh = mesh.to_boundary();
     println!("num tri {}", mesh.elems().len());
@@ -131,12 +131,12 @@ fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
     let mut na_faces = Vec::with_capacity(mesh.elems().len());
     let mut na_normals = Vec::with_capacity(mesh.elems().len());
     for (i, elem) in mesh.elems().iter().enumerate() {
-        /*let elem_var = if mesh.elem_vars().is_empty() {
+        let elem_var = if mesh.elem_vars().is_empty() {
             0.5
         } else {
             mesh.elem_var(0)[i]
-        };*/
-        let elem_var = mesh.elem_var(var)[i];
+        };
+        //let elem_var = mesh.elem_var(var)[i];
 
         //for elem in elem.sides() {
             let i = na_verts.len();

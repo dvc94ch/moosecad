@@ -227,6 +227,61 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
         self.diff(bar2).magnitude()
     }
 
+    pub fn intersects(&self, a: &Bar2, b: &Bar2) -> bool {
+        let zero = S::from_f64(0.0).unwrap();
+        let one = S::from_f64(1.0).unwrap();
+
+        if a == b || a == &Bar2([b.node(1), b.node(0)]) {
+            // identical line segments
+            return false;
+        }
+
+        let a0 = self.vertex(a.node(0)).coords;
+        let a1 = self.vertex(a.node(1)).coords;
+        let b0 = self.vertex(b.node(0)).coords;
+        let b1 = self.vertex(b.node(1)).coords;
+
+        let da = a1 - a0;
+        let db = b1 - b0;
+        let dc = b0 - a0;
+
+        let cross_da_db = da.cross(&db);
+        let cross_dc_da = dc.cross(&da);
+        let cross_dc_db = dc.cross(&db);
+
+        if dc.dot(&cross_da_db) != zero {
+            // no intersection
+            return false;
+        }
+
+        let cross_da_db_mag2 = cross_da_db.magnitude_squared();
+        if cross_da_db_mag2 == zero {
+            // parallel
+            return false;
+            // todo colinear
+        }
+
+        let s = cross_dc_db.dot(&cross_da_db) / cross_da_db_mag2;
+        if s < zero || s > one {
+            // no intersection
+            return false;
+        }
+        let t = cross_dc_da.dot(&cross_da_db) / cross_da_db_mag2;
+        if t < zero || t > one {
+            // no intersection
+            return false;
+        }
+
+        // intersection in one location
+        let ip = a0 + da * s;
+        if (ip == a0 || ip == a1) && (ip == b0 || ip == b1) {
+            // intersection is an endpoint of both line segments
+            return false;
+        }
+
+        true
+    }
+
     pub fn normal(&self, tri3: &Tri3) -> Vector3<S> {
         let a = self.coords[tri3.node(0)];
         let b = self.coords[tri3.node(1)];
@@ -325,6 +380,29 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
         }
         mesh.compact();
         mesh
+    }
+
+    pub fn edge_intersections(&self) -> usize
+    where
+        E: Element2<Edge = Bar2>,
+    {
+        let mut res = 0;
+        for (ia, a) in self.elems().iter().enumerate() {
+            for (ib, b) in self.elems().iter().enumerate() {
+                if a == b {
+                    continue;
+                }
+                for i in a.edges() {
+                    for j in b.edges() {
+                        if self.intersects(&i, &j) {
+                            println!("{} {:?} intersects {} {:?} with edge {:?} at {:?}", ia, a, ib, b, i, j);
+                            res += 1;
+                        }
+                    }
+                }
+            }
+        }
+        res
     }
 }
 
@@ -739,5 +817,57 @@ mod tests {
         mesh.add_vertex(Point3::new(1.0, -1.0, -1.0));
         mesh.add_elem(Tet4::new([0, 1, 3, 2]), &[]);
         assert_eq!(mesh.aspect_ratio(mesh.elem(0)), 1.0);
+    }
+
+    #[test]
+    fn test_intersect() {
+        let a = Point3::new(2.0, 1.0, 5.0);
+        let b = Point3::new(1.0, 2.0, 5.0);
+        let c = Point3::new(2.0, 1.0, 3.0);
+        let d = Point3::new(2.0, 1.0, 2.0);
+        let mut mesh = Mesh::<Tet4, _>::new();
+        mesh.add_vertex(a);
+        mesh.add_vertex(b);
+        mesh.add_vertex(c);
+        mesh.add_vertex(d);
+        assert_eq!(mesh.intersects(&Bar2([0, 1]), &Bar2([2, 3])), false);
+    }
+
+    #[test]
+    fn test_intersect2() {
+        let a = Point3::new(2.0, 1.0, 5.0);
+        let b = Point3::new(1.0, 2.0, 5.0);
+        let c = Point3::new(2.0, 1.0, 2.0);
+        let d = Point3::new(3.0, 3.0, 3.0);
+        let mut mesh = Mesh::<Tri3, _>::new();
+        mesh.add_vertex(a);
+        mesh.add_vertex(b);
+        mesh.add_vertex(c);
+        mesh.add_vertex(d);
+        assert_eq!(mesh.intersects(&Bar2([0, 1]), &Bar2([0, 2])), false);
+        mesh.add_elem(Tri3::new([0, 1, 2]), &[]);
+        mesh.add_elem(Tri3::new([0, 2, 3]), &[]);
+        assert_eq!(mesh.edge_intersections(), 0);
+    }
+
+    #[test]
+    fn test_intersect3() {
+        let a = Point3::new(0.0, 0.0, 0.0);
+        let b = Point3::new(0.0, 1.0, 0.0);
+        let c = Point3::new(1.0, 0.0, 0.0);
+        let d = Point3::new(1.0, 1.0, 0.0);
+        let e = Point3::new(0.5, 0.5, 0.0);
+        let mut mesh = Mesh::<Tri3, _>::new();
+        mesh.add_vertex(a);
+        mesh.add_vertex(b);
+        mesh.add_vertex(c);
+        mesh.add_vertex(d);
+        mesh.add_vertex(e);
+        mesh.add_elem(Tri3::new([0, 1, 2]), &[]);
+        mesh.add_elem(Tri3::new([1, 2, 3]), &[]);
+        assert_eq!(mesh.edge_intersections(), 0);
+        mesh.elem_swap_remove(1);
+        mesh.add_elem(Tri3::new([2, 3, 4]), &[]);
+        assert_eq!(mesh.edge_intersections(), 2);
     }
 }
