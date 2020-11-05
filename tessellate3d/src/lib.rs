@@ -182,7 +182,7 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
 
     /// Interpolates the point where two coordinates intersect the boundary of the function.
     #[allow(unused)]
-    fn cut_edge_bisect(&mut self, a: usize, b: usize) -> usize {
+    fn cut_edge(&mut self, a: usize, b: usize) -> usize {
         let zero = S::from_f64(0.0).unwrap();
         let half = S::from_f64(0.5).unwrap();
         debug_assert!(
@@ -211,6 +211,28 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
 
         let index = self.mesh.vertices().len();
         self.mesh.add_vertex(c);
+        self.phi.push(zero);
+        self.cut_map.insert(edge, index);
+        index
+    }
+
+    /// Interpolates the point where two coordinates intersect the boundary of the function.
+    #[allow(unused)]
+    fn cut_edge_quartet(&mut self, a: usize, b: usize) -> usize {
+        let zero = S::from_f64(0.0).unwrap();
+        let one = S::from_f64(1.0).unwrap();
+        debug_assert!(
+            self.phi[a] > zero && self.phi[b] < zero || self.phi[a] < zero && self.phi[b] > zero
+        );
+        let edge = (usize::min(a, b), usize::max(a, b));
+        if let Some(i) = self.cut_map.get(&edge) {
+            return *i;
+        }
+        let alpha = self.phi[a] / self.phi[a] - self.phi[b];
+        let vertex =
+            self.mesh.vertex(a).coords * (one - alpha) + self.mesh.vertex(b).coords * alpha;
+        let index = self.mesh.vertices().len();
+        self.mesh.add_vertex(Point3::from(vertex));
         self.phi.push(zero);
         self.cut_map.insert(edge, index);
         index
