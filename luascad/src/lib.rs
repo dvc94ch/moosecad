@@ -334,6 +334,7 @@ pub fn eval(script: &str) -> Result<HashMap<String, geom::Output>, hlua::LuaErro
 #[cfg(test)]
 mod tests {
     use super::eval;
+    use nalgebra as na;
 
     #[test]
     fn test_primitives() {
@@ -356,9 +357,10 @@ mod tests {
         assert!(res.contains_key("xplicit"));
         let res = eval(
             r#"
-            cube = geom.cube(1, 1, 1, 0.0)
-            top = cube:intersection(geom.plane_x(0.5), 0.0)
-            bottom = cube:intersection(geom.plane_neg_x(0.5), 0.0)
+            cube = geom.cube(1.0, 1.0, 1.0, 0.0)
+            plane = geom.cube(1.0, 1.0, 0.01, 0.0)
+            top = cube:intersection(plane:translate(0.0, 0.0, 0.5), 0.0)
+            bottom = cube:intersection(plane:translate(0.0, 0.0, -0.5), 0.0)
             return {
                 cube = cube:volume(),
                 top = top:boundary(),
@@ -369,5 +371,9 @@ mod tests {
         assert!(res.contains_key("cube"));
         assert!(res.contains_key("top"));
         assert!(res.contains_key("bottom"));
+
+        let top = res.get("top").unwrap().boundary().unwrap();
+        assert_eq!(top.approx_value(&na::Point3::new(0.0, 0.0, 0.5), 0.0), 0.0);
+        assert_eq!(top.approx_value(&na::Point3::new(0.0, 0.0, 1.0), 0.0), 0.5);
     }
 }

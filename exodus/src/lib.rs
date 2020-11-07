@@ -25,10 +25,12 @@ pub fn write(mesh: &Mesh<Tet4, f64>, path: &Path) -> Result<(), Error> {
     let num_blocks = 1;
     let num_elem = mesh.elems().len();
     let num_elem_var = mesh.elem_vars().len();
+    let num_side_sets = mesh.side_sets().len();
     file.add_dimension("num_dim", NUM_DIM)?;
     file.add_dimension("num_nodes", num_nodes)?;
     file.add_dimension("num_elem", num_elem)?;
     file.add_dimension("num_el_blk", num_blocks)?;
+    file.add_dimension("num_side_sets", num_side_sets)?;
     file.add_dimension("num_elem_var", num_elem_var)?;
     file.add_dimension("len_string", LEN_STRING)?;
     file.add_unlimited_dimension("time_step")?;
@@ -87,7 +89,32 @@ pub fn write(mesh: &Mesh<Tet4, f64>, path: &Path) -> Result<(), Error> {
     connect.add_attribute("elem_type", "TETRA4")?;
     connect.put_values(&elems, None, None)?;
 
-    // TODO side sets
+    let mut ss_names = file.add_variable_with_type(
+        "ss_names",
+        &["num_side_sets", "len_string"],
+        &VariableType::Basic(BasicType::Char),
+    )?;
+    let mut ss_names_data = Vec::with_capacity(num_side_sets * LEN_STRING);
+    for side_set in mesh.side_sets().iter() {
+        ss_names_data.extend_from_slice(side_set.name().unwrap_or_default().as_ref());
+    }
+    ss_names.put_chars(&ss_names_data, None, None)?;
+
+    for (i, side_set) in mesh.side_sets().iter().enumerate() {
+        let num_side_ss = side_set.sides().len();
+        let mut elem_ss = Vec::with_capacity(num_side_ss);
+        let mut side_ss = Vec::with_capacity(num_side_ss);
+        for (elem, side) in side_set.sides() {
+            elem_ss.push(*elem as i32 + 1);
+            side_ss.push(*side as i32 + 1);
+        }
+        let num_side_ss_key = format!("num_side_ss{}", i + 1);
+        file.add_dimension(&num_side_ss_key, num_side_ss)?;
+        let mut elem_ss_var = file.add_variable::<i32>(&format!("elem_ss{}", i + 1), &[&num_side_ss_key])?;
+        elem_ss_var.put_values(&elem_ss, None, None)?;
+        let mut side_ss_var = file.add_variable::<i32>(&format!("side_ss{}", i + 1), &[&num_side_ss_key])?;
+        side_ss_var.put_values(&side_ss, None, None)?;
+    }
 
     // elem vars
     let mut name_elem_var = file.add_variable_with_type(
@@ -95,7 +122,7 @@ pub fn write(mesh: &Mesh<Tet4, f64>, path: &Path) -> Result<(), Error> {
         &["num_elem_var", "len_string"],
         &VariableType::Basic(BasicType::Char),
     )?;
-    let mut name_elem_var_data = Vec::with_capacity(mesh.elem_vars().len() * LEN_STRING);
+    let mut name_elem_var_data = Vec::with_capacity(num_elem_var * LEN_STRING);
     for name in mesh.elem_vars() {
         name_elem_var_data.extend_from_slice(name.as_ref());
     }

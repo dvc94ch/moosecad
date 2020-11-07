@@ -92,8 +92,8 @@ fn main() -> Result<(), Error> {
             let mut add = true;
             for node in mesh.elem(*elem).side(*side).nodes() {
                 let point = mesh.vertex(node);
-                let phi = boundary.approx_value(point, tessellation_resolution);
-                if phi < f64::EPSILON && phi > -f64::EPSILON {
+                let phi = boundary.approx_value(point, f64::EPSILON);
+                if phi > f64::EPSILON || phi < -f64::EPSILON {
                     add = false;
                     break;
                 }
