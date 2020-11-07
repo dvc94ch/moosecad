@@ -1,4 +1,5 @@
 use hlua_derive::lua;
+use std::collections::HashMap;
 pub use implicit3d;
 
 pub struct LuaSandbox<'lua> {
@@ -271,18 +272,38 @@ pub mod geom {
             }
         }
 
+        pub fn volume(&self) -> Output {
+            Output::Volume(self.o.clone())
+        }
+
+        pub fn boundary(&self) -> Output {
+            Output::Boundary(self.o.clone())
+        }
+
         #[lua(meta = "__tostring")]
         pub fn to_string(&self) -> String {
             format!("{:#?}", self.o)
         }
     }
+
+    #[derive(Clone, Debug)]
+    pub enum Output {
+        Volume(Box<dyn Object<f64>>),
+        Boundary(Box<dyn Object<f64>>),
+    }
+
+    impl Output {
+        #[lua(meta = "__tostring")]
+        pub fn to_string(&self) -> String {
+            format!("{:#?}", self)
+        }
+    }
 }
 
-pub fn eval(script: &str) -> Result<Box<dyn implicit3d::Object<f64>>, hlua::LuaError> {
+pub fn eval(script: &str) -> Result<HashMap<String, geom::Output>, hlua::LuaError> {
     let mut lua = LuaSandbox::new()?;
     lua.load(&geom::load);
-    let obj: geom::LObject = lua.execute(script)?;
-    Ok(obj.o)
+    lua.execute(script)
 }
 
 #[cfg(test)]
@@ -291,17 +312,34 @@ mod tests {
 
     #[test]
     fn test_primitives() {
-        eval("return geom.cube(1, 1, 1, 0.0):translate(1.0, 1.0, 1.0)").unwrap();
-        eval("return geom.sphere(0.5)").unwrap();
-        eval(
+        let res = eval("return { cube = geom.cube(1, 1, 1, 0.0):translate(1.0, 1.0, 1.0):volume() }").unwrap();
+        assert!(res.contains_key("cube"));
+        let res = eval("return { sphere = geom.sphere(0.5):volume() }").unwrap();
+        assert!(res.contains_key("sphere"));
+        let res = eval(
             r#"
             cube = geom.cube(1, 1, 1, 0.3)
             sphere = geom.sphere(0.5)
             diff = cube:difference(sphere, 0.3)
             union = cube:union(sphere, 0.3)
-            return diff:scale(15, 15, 15)
+            return { xplicit = diff:scale(15, 15, 15):volume() }
         "#,
         )
         .unwrap();
+        assert!(res.contains_key("xplicit"));
+        let res = eval(
+            r#"
+            cube = geom.cube(1, 1, 1, 0.0)
+            top = cube:intersection(geom.plane_x(0.5), 0.0)
+            bottom = cube:intersection(geom.plane_neg_x(0.5), 0.0)
+            return {
+                cube = cube:volume(),
+                top = top:boundary(),
+                bottom = bottom:boundary(),
+            }"#
+        ).unwrap();
+        assert!(res.contains_key("cube"));
+        assert!(res.contains_key("top"));
+        assert!(res.contains_key("bottom"));
     }
 }
