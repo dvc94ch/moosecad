@@ -139,19 +139,15 @@ fn read_mesh(path: &Path) -> Result<Rc<RefCell<Mesh>>, Error> {
         //let elem_var = mesh.elem_var(var)[i];
 
         //for elem in elem.sides() {
-            let i = na_verts.len();
-            for node in elem.nodes() {
-                let p = mesh.vertex(node);
-                na_verts.push(na::Point3::new(p[0] as f32, p[1] as f32, p[2] as f32));
-                na_tex.push(na::Point2::new(elem_var as f32, 0.5));
-            }
-            na_faces.push(na::Point3::new(
-                i as u16 + 0,
-                i as u16 + 1,
-                i as u16 + 2,
-            ));
-            let n = mesh.normal(&elem);
-            na_normals.push(na::Vector3::new(n[0] as f32, n[1] as f32, n[2] as f32));
+        let i = na_verts.len();
+        for node in elem.nodes() {
+            let p = mesh.vertex(node);
+            na_verts.push(na::Point3::new(p[0] as f32, p[1] as f32, p[2] as f32));
+            na_tex.push(na::Point2::new(elem_var as f32, 0.5));
+        }
+        na_faces.push(na::Point3::new(i as u16 + 0, i as u16 + 1, i as u16 + 2));
+        let n = mesh.normal(&elem);
+        na_normals.push(na::Vector3::new(n[0] as f32, n[1] as f32, n[2] as f32));
         //}
     }
     let mesh = Mesh::new(na_verts, na_faces, Some(na_normals), Some(na_tex), true);

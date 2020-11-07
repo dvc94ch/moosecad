@@ -67,11 +67,7 @@ pub fn write(mesh: &Mesh<Tet4, f64>, path: &Path) -> Result<(), Error> {
             &["num_el_blk", "len_string"],
             &VariableType::Basic(BasicType::Char),
         )?;
-        eb_names.put_chars(
-            name.as_bytes(),
-            None,
-            None,
-        )?;
+        eb_names.put_chars(name.as_bytes(), None, None)?;
     }
 
     let mut eb_prop = file.add_variable::<i32>("eb_prop1", &["num_el_blk"])?;

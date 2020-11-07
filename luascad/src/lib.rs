@@ -1,6 +1,6 @@
 use hlua_derive::lua;
-use std::collections::HashMap;
 pub use implicit3d;
+use std::collections::HashMap;
 
 pub struct LuaSandbox<'lua> {
     lua: hlua::Lua<'lua>,
@@ -312,7 +312,9 @@ mod tests {
 
     #[test]
     fn test_primitives() {
-        let res = eval("return { cube = geom.cube(1, 1, 1, 0.0):translate(1.0, 1.0, 1.0):volume() }").unwrap();
+        let res =
+            eval("return { cube = geom.cube(1, 1, 1, 0.0):translate(1.0, 1.0, 1.0):volume() }")
+                .unwrap();
         assert!(res.contains_key("cube"));
         let res = eval("return { sphere = geom.sphere(0.5):volume() }").unwrap();
         assert!(res.contains_key("sphere"));
@@ -336,8 +338,9 @@ mod tests {
                 cube = cube:volume(),
                 top = top:boundary(),
                 bottom = bottom:boundary(),
-            }"#
-        ).unwrap();
+            }"#,
+        )
+        .unwrap();
         assert!(res.contains_key("cube"));
         assert!(res.contains_key("top"));
         assert!(res.contains_key("bottom"));

@@ -406,15 +406,15 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
             let v = self.mesh.volume(tet);
             let ar = self.mesh.aspect_ratio(tet);
             if v <= zero {
-                println!(
-                    "Tet #{} is inverted! volume = {} aspect = {}",
-                    i, v, ar,
-                );
+                println!("Tet #{} is inverted! volume = {} aspect = {}", i, v, ar,);
             }
             aspect_ratio.0 = Float::min(aspect_ratio.0, ar);
             aspect_ratio.1 = Float::max(aspect_ratio.1, ar);
         }
-        println!("aspect_ratio: min = {} max = {}", aspect_ratio.0, aspect_ratio.1);
+        println!(
+            "aspect_ratio: min = {} max = {}",
+            aspect_ratio.0, aspect_ratio.1
+        );
     }
 
     pub fn tessellate(mut self) -> Mesh<Tet4, S> {

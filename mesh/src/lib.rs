@@ -294,8 +294,7 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
         let b = self.coords[tet4.node(1)];
         let c = self.coords[tet4.node(2)];
         let d = self.coords[tet4.node(3)];
-        Matrix3::from_columns(&[a - d, b - d, c - d]).determinant()
-            / S::from_f64(6.0).unwrap()
+        Matrix3::from_columns(&[a - d, b - d, c - d]).determinant() / S::from_f64(6.0).unwrap()
     }
 
     pub fn aspect_ratio(&self, tet4: &Tet4) -> S {
@@ -368,7 +367,10 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
             coords: self.coords.clone(),
             elems: Vec::with_capacity(boundary.sides().len()),
             elem_var_names: self.elem_var_names.clone(),
-            elem_var_values: vec![Vec::with_capacity(boundary.sides().len()); self.elem_var_values.len()],
+            elem_var_values: vec![
+                Vec::with_capacity(boundary.sides().len());
+                self.elem_var_values.len()
+            ],
             side_sets: Default::default(),
         };
         let mut values = vec![zero; self.elem_var_values.len()];
@@ -395,7 +397,10 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
                 for i in a.edges() {
                     for j in b.edges() {
                         if self.intersects(&i, &j) {
-                            println!("{} {:?} intersects {} {:?} with edge {:?} at {:?}", ia, a, ib, b, i, j);
+                            println!(
+                                "{} {:?} intersects {} {:?} with edge {:?} at {:?}",
+                                ia, a, ib, b, i, j
+                            );
                             res += 1;
                         }
                     }
