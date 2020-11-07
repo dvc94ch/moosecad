@@ -717,6 +717,7 @@ version = "0.1.0"
 dependencies = [
  "hlua",
  "proc-macro-error",
+ "proc-macro2 1.0.24",
  "quote 1.0.7",
  "syn",
 ]

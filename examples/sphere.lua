@@ -1,1 +1,1 @@
-build(Sphere(0.5))
+return geom.sphere(0.5)

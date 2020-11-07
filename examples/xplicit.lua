@@ -1,6 +1,4 @@
-cube = Box(1,1,1,0.3)
-sphere = Sphere(0.5)
-diff = Difference({cube, sphere}, 0.3)
-diff=diff:scale(15,15,15)
-
-build(diff)
+cube = geom.cube(1, 1, 1, 0.3)
+sphere = geom.sphere(0.5)
+diff = cube:difference(sphere, 0.3)
+return diff:scale(15, 15, 15)

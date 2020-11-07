@@ -1,1 +1,1 @@
-build(Box(1, 1, 1, 0.0))
+return geom.cube(1, 1, 1, 0.0)

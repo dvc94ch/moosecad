@@ -48,25 +48,23 @@ fn main() -> Result<(), Error> {
 
     let bytes = std::fs::read(opts.input)?;
     let utf8 = String::from_utf8(bytes)?;
-    let (out, obj) = luascad::eval(&utf8)?;
-    println!("{}", out);
-    if let Some(mut implicit) = obj {
-        implicit.set_parameters(&luascad::implicit3d::PrimitiveParameters {
-            fade_range,
-            r_multiplier,
-        });
-        println!("starting tessellation");
-        let mesh = tessellate3d::IsosurfaceStuffing::new(
-            &ObjectAdaptor {
-                implicit,
-                tessellation_resolution,
-            },
+    let mut obj = luascad::eval(&utf8)?;
+    obj.set_parameters(&luascad::implicit3d::PrimitiveParameters {
+        fade_range,
+        r_multiplier,
+    });
+    println!("starting tessellation");
+    let mesh = tessellate3d::IsosurfaceStuffing::new(
+        &ObjectAdaptor {
+            implicit: obj,
             tessellation_resolution,
-            tessellation_error,
-        )
-        .tessellate();
-        println!("tessellation complete");
-        exodus::write(&mesh, &opts.output)?;
-    }
+        },
+        tessellation_resolution,
+        tessellation_error,
+    )
+    .tessellate();
+    println!("tessellation complete");
+    exodus::write(&mesh, &opts.output)?;
+
     Ok(())
 }
