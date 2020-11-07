@@ -353,15 +353,15 @@ impl<'a, S: Float + RealField + alga::general::RealField + From<f64>> Isosurface
         }
 
         println!("stats {:?}", stats);
-        self.mesh.add_elem_var("tet_type");
-        for (mut tet, flipped, ty) in new_tets.drain(..) {
+        //self.mesh.add_elem_var("tet_type");
+        for (mut tet, flipped, _ty) in new_tets.drain(..) {
             if flipped {
                 let a = tet.node(0);
                 *tet.node_mut(0) = tet.node(1);
                 *tet.node_mut(1) = a;
             }
             self.mesh
-                .add_elem(tet, &[S::from_f64(ty as f64 / 6.0).unwrap()]);
+                .add_elem(tet, &[/*S::from_f64(ty as f64 / 6.0).unwrap()*/]);
         }
         println!("num tets {}", self.mesh.elems().len());
     }

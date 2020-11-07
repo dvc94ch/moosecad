@@ -300,6 +300,31 @@ pub mod geom {
     }
 }
 
+impl geom::Output {
+    pub fn volume(&self) -> Option<&dyn implicit3d::Object<f64>> {
+        if let Self::Volume(obj) = self {
+            Some(&**obj)
+        } else {
+            None
+        }
+    }
+
+    pub fn boundary(&self) -> Option<&dyn implicit3d::Object<f64>> {
+        if let Self::Boundary(obj) = self {
+            Some(&**obj)
+        } else {
+            None
+        }
+    }
+
+    pub fn object_mut(&mut self) -> &mut dyn implicit3d::Object<f64> {
+        match self {
+            Self::Volume(obj) => &mut **obj,
+            Self::Boundary(obj) => &mut **obj,
+        }
+    }
+}
+
 pub fn eval(script: &str) -> Result<HashMap<String, geom::Output>, hlua::LuaError> {
     let mut lua = LuaSandbox::new()?;
     lua.load(&geom::load);
