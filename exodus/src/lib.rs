@@ -63,17 +63,23 @@ pub fn write(mesh: &Mesh<Tet4, f64>, path: &Path) -> Result<(), Error> {
     coord.put_values(&vertices, None, None)?;
 
     // block
-    if let Some(name) = mesh.name() {
-        let mut eb_names = file.add_variable_with_type(
+    /*if let Some(name) = mesh.name() {
+        /*let mut eb_names = file.add_variable_with_type(
             "eb_names",
             &["num_el_blk", "len_string"],
             &VariableType::Basic(BasicType::Char),
         )?;
-        eb_names.put_chars(name.as_bytes(), None, None)?;
-    }
+        eb_names.put_chars(name.as_bytes(), None, None)?;*/
+        let mut eb_names = file.add_string_variable("eb_names", &["num_el_blk"])?;
+        eb_names.put_string(name, None)?;
+    }*/
 
     let mut eb_prop = file.add_variable::<i32>("eb_prop1", &["num_el_blk"])?;
     eb_prop.put_values(&[0], None, None)?;
+
+    let ids = (0..num_side_sets).map(|i| i as i32).collect::<Vec<_>>();
+    let mut ss_prop = file.add_variable::<i32>("ss_prop1", &["num_side_sets"])?;
+    ss_prop.put_values(&ids, None, None)?;
 
     let num_elems = mesh.elems().len();
     let mut elems = vec![0; num_elems * Tet4::N_NODES];
@@ -89,7 +95,12 @@ pub fn write(mesh: &Mesh<Tet4, f64>, path: &Path) -> Result<(), Error> {
     connect.add_attribute("elem_type", "TETRA4")?;
     connect.put_values(&elems, None, None)?;
 
-    let mut ss_names = file.add_variable_with_type(
+    let elem_num_map = (0..num_elems).map(|i| i as i32 + 1).collect::<Vec<_>>();
+    let mut elem_num_map_var = file.add_variable::<i32>("elem_num_map", &["num_elem"])?;
+    elem_num_map_var.put_values(&elem_num_map, None, None)?;
+
+
+    /*let mut ss_names = file.add_variable_with_type(
         "ss_names",
         &["num_side_sets", "len_string"],
         &VariableType::Basic(BasicType::Char),
@@ -98,7 +109,11 @@ pub fn write(mesh: &Mesh<Tet4, f64>, path: &Path) -> Result<(), Error> {
     for side_set in mesh.side_sets().iter() {
         ss_names_data.extend_from_slice(side_set.name().unwrap_or_default().as_ref());
     }
-    ss_names.put_chars(&ss_names_data, None, None)?;
+    ss_names.put_chars(&ss_names_data, None, None)?;*/
+    /*let mut ss_names = file.add_string_variable("ss_names", &["num_side_sets"])?;
+    for (i, side_set) in mesh.side_sets().iter().enumerate() {
+        ss_names.put_string(side_set.name().unwrap_or_default(), Some(&[i]))?;
+    }*/
 
     for (i, side_set) in mesh.side_sets().iter().enumerate() {
         let num_side_ss = side_set.sides().len();

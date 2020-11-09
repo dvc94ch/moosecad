@@ -56,7 +56,7 @@ pub trait BoundedElement: Element1 {
 /// TODO: multiple timesteps, multiple blocks, node sets, node vars.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Mesh<E: BoundedElement, S: RealField> {
-    name: Option<Name>,
+    name: Option<String>,
     coords: Vec<Point3<S>>,
     elems: Vec<E>,
     elem_var_names: Vec<Name>,
@@ -67,7 +67,7 @@ pub struct Mesh<E: BoundedElement, S: RealField> {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SideSet<E: BoundedElement> {
     _marker: PhantomData<E::Side>,
-    name: Option<Name>,
+    name: Option<String>,
     sides: HashSet<(usize, usize)>,
 }
 
@@ -85,7 +85,7 @@ impl<E: BoundedElement> SideSet<E> {
     }
 
     pub fn set_name(&mut self, name: &str) {
-        self.name = Some(Name::from(name));
+        self.name = Some(name.to_string());
     }
 
     pub fn add_side(&mut self, elem: usize, side: usize) -> bool {
@@ -118,7 +118,7 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
     }
 
     pub fn set_name(&mut self, name: &str) {
-        self.name = Some(Name::from(name));
+        self.name = Some(name.to_string());
     }
 
     pub fn add_vertex(&mut self, point: Point3<S>) -> usize {
@@ -362,13 +362,14 @@ impl<E: BoundedElement, S: Float + RealField> Mesh<E, S> {
     {
         let zero = S::from_f64(0.0).unwrap();
         let boundary = self.boundary();
+        let num_sides = boundary.sides().len();
         let mut mesh = Mesh {
-            name: boundary.name,
+            name: boundary.name.clone(),
             coords: self.coords.clone(),
-            elems: Vec::with_capacity(boundary.sides().len()),
+            elems: Vec::with_capacity(num_sides),
             elem_var_names: self.elem_var_names.clone(),
             elem_var_values: vec![
-                Vec::with_capacity(boundary.sides().len());
+                Vec::with_capacity(num_sides);
                 self.elem_var_values.len()
             ],
             side_sets: Default::default(),
